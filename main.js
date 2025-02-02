@@ -1,38 +1,23 @@
 ﻿const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
-function createWindow() {
-    // Utwórz nowe okno przeglądarki
-    const win = new BrowserWindow({
+let mainWindow;
+
+app.whenReady().then(() => {
+    mainWindow = new BrowserWindow({
         width: 800,
         height: 600,
         webPreferences: {
-            // Wskazanie ścieżki do preload.js (opcjonalne)
-            preload: path.join(__dirname, 'preload.js'),
-            nodeIntegration: true,  // Możesz ustawić na false dla lepszej bezpieczeństwa i korzystać z preload
-            contextIsolation: false // Jeśli true, będziesz musiał wystawiać API do renderera przez preload
+            nodeIntegration: true
         }
     });
 
-    // Załaduj plik index.html
-    win.loadFile('index.html');
+    // Ładuje aplikację Vue zamiast index.html
+    mainWindow.loadURL('http://localhost:5173');
 
-    // Opcjonalnie: otwórz narzędzia deweloperskie
-    // win.webContents.openDevTools();
-}
-
-// Wywołanie funkcji, gdy Electron zakończy inicjalizację
-app.whenReady().then(() => {
-    createWindow();
-
-    app.on('activate', function () {
-        // Na macOS, aplikacja powinna ponownie utworzyć okno, jeśli wszystkie zostały zamknięte
-        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    app.on('window-all-closed', () => {
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
     });
-});
-
-// Zamknięcie aplikacji, gdy wszystkie okna są zamknięte
-app.on('window-all-closed', function () {
-    // Na macOS zwykle aplikacje działają dalej, dopóki użytkownik nie zamknie jej explicite
-    if (process.platform !== 'darwin') app.quit();
 });
