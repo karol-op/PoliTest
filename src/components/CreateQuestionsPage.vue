@@ -94,7 +94,7 @@
 
         computed: {
             storedTestName() {
-                return this.sanitize(this.route.query.testName || 'Nienazwany test')
+                return this.sanitize(this.route.query.testName || 'nienazwany_test')
             },
 
             hasValidAnswers() {
@@ -131,32 +131,31 @@
             handleSubmit() {
                 if (!this.validateForm()) return
 
-                // Generowanie znacznika poprawnych odpowiedzi
-                const correctAnswersMarker = 'X' + this.answers
-                    .map(answer => answer.isCorrect ? '1' : '0')
-                    .join('')
+                // Generowanie znacznika odpowiedzi
+                const correctMarker = 'X' + this.answers.map(a => a.isCorrect ? '1' : '0').join('')
+
+                // Generowanie nazwy pliku
+                const fileName = `TESTY/${this.storedTestName}/`
+                    + `${this.sanitize(this.currentQuestion).substring(0, 20)}_${correctMarker}.txt`
 
                 // Tworzenie zawartości pliku
                 const fileContent = [
-                    correctAnswersMarker,
+                    correctMarker,
                     this.currentQuestion,
                     ...this.answers.map(a => a.text.trim())
                 ].join('\n')
 
-                // Generowanie nazwy pliku
-                const questionFilename = this.sanitize(this.currentQuestion).substring(0, 20)
-                const testFolder = this.storedTestName
-                const filename = `TESTY/${testFolder}/${questionFilename}_${correctAnswersMarker}.txt`
-
-                // Tworzenie i pobieranie pliku
+                // Automatyczne pobieranie
                 const blob = new Blob([fileContent], { type: 'text/plain' })
                 const link = document.createElement('a')
                 link.href = URL.createObjectURL(blob)
-                link.download = filename
+                link.download = fileName
+                link.style.display = 'none'
+                document.body.appendChild(link)
                 link.click()
+                document.body.removeChild(link)
                 URL.revokeObjectURL(link.href)
 
-                // Reset formularza
                 this.resetForm()
             },
 
@@ -212,7 +211,12 @@
 </script>
 
 <style scoped>
-    /* Style pozostają bez zmian jak w poprzedniej wersji */
+    .questions-page {
+        max-width: 800px;
+        margin: 20px auto;
+        padding: 20px;
+    }
+
     .test-name-header {
         margin-bottom: 2rem;
         padding-bottom: 1rem;
@@ -224,6 +228,10 @@
         margin-top: 0.5rem;
     }
 
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
     .question-input {
         width: 100%;
         padding: 1rem;
@@ -231,6 +239,10 @@
         border-radius: 8px;
         font-size: 1.1rem;
         resize: none;
+    }
+
+    .answers-section {
+        margin: 2rem 0;
     }
 
     .answer-item {
@@ -248,6 +260,14 @@
         border-radius: 6px;
     }
 
+    .correct-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+        margin-left: 1rem;
+    }
+
     .remove-btn {
         background: #ff4444;
         color: white;
@@ -259,8 +279,6 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 0;
-        transition: background 0.2s;
     }
 
     .input-error {
@@ -271,7 +289,6 @@
         color: #ff4444;
         font-size: 0.9rem;
         margin-top: 0.5rem;
-        display: block;
     }
 
     .button-group {
@@ -287,7 +304,6 @@
         border: none;
         border-radius: 6px;
         cursor: pointer;
-        font-weight: bold;
     }
 
     .submit-btn {
@@ -297,7 +313,6 @@
         border: none;
         border-radius: 6px;
         cursor: pointer;
-        font-weight: bold;
     }
 
     .back-btn {
