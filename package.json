@@ -1,14 +1,21 @@
 {
-  "name": "my-electron-app",
+  "name": "moja-aplikacja",
   "version": "1.0.0",
-  "description": "Hello World application using Electron",
+  "description": "Moja pierwsza aplikacja Electron",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^25.0.0" 
+    "electron": "^25.0.0",
+    "electron-builder": "^23.6.0"
   },
-  "author": "Karol Bogacz Jakub Kasprzyk",
-  "license": "MIT"
+  "build": {
+    "appId": "com.twojafirma.mojaaplikacja",
+    "productName": "MojaAplikacja",
+    "win": {
+      "target": "nsis"
+    }
+  }
 }
