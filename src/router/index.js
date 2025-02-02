@@ -1,15 +1,41 @@
-import { createMemoryHistory, createRouter } from 'vue-router'
-import HomePage from '../components/HomePage.vue'
-import CreateTestPage from '../components/CreateTestPage.vue'
+﻿import { createRouter, createWebHistory } from 'vue-router';
+import EmptyLayout from '../layouts/EmptyLayout.vue';
+import MainLayout from '../layouts/MainLayout.vue';
+import HomePage from '../components/HomePage.vue';
+import CreateTest from '../components/CreateTestPage.vue';
 
 const routes = [
-    { path: '/', component: HomePage },
-    { path: '/createtest', component: CreateTestPage},
-]
+    // Landing page z EmptyLayout
+    {
+        path: '/',
+        component: EmptyLayout,
+        children: [
+            {
+                path: '',
+                name: 'home',
+                component: HomePage // Strona docelowa bez nawigacji
+            }
+        ]
+    },
+
+    // Wszystkie inne strony z MainLayout
+    {
+        path: '/',
+        component: MainLayout, // Główny layout z nawigacją
+        children: [
+            {
+                path: 'createtest',
+                name: 'createtest',
+                component: CreateTest
+            },
+            // Dodaj inne podstrony tutaj
+        ]
+    }
+];
 
 const router = createRouter({
-    history: createMemoryHistory(),
-    routes,
-})
+    history: createWebHistory(),
+    routes
+});
 
-export default router
+export default router;
