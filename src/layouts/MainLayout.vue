@@ -1,7 +1,6 @@
 ﻿<template>
     <div>
         <nav>
-            <RouterLink to="/">Home</RouterLink>
             <!-- Inne linki -->
         </nav>
 

@@ -1,53 +1,46 @@
 ﻿<template>
     <div class="create-test-page">
-        <h1>Create New Test</h1>
+        <h1>Utwórz nowy test</h1>
 
         <form @submit.prevent="handleSubmit">
             <div class="form-group">
-                <label for="testTitle">Test Title:</label>
+                <label for="testName">Nazwa testu:</label>
                 <input type="text"
-                       id="testTitle"
-                       v-model="testTitle"
+                       id="testName"
+                       v-model.trim="testName"
                        required
-                       placeholder="Enter test title">
+                       placeholder="Wpisz nazwę testu"
+                       class="test-name-input">
             </div>
 
-            <div class="form-group">
-                <label>Questions:</label>
-                <textarea v-model="questions"
-                          placeholder="Enter questions (one per line)"
-                          rows="5"></textarea>
-            </div>
-
-            <button type="submit" class="submit-btn">Create Test</button>
+            <button type="submit" class="submit-btn">Przejdź do tworzenia pytań</button>
         </form>
     </div>
-    <nav>
-        <RouterLink to="/">Home</RouterLink>
-    </nav>
 </template>
 
 <script>
+    import { useRouter } from 'vue-router'
+
     export default {
+        setup() {
+            const router = useRouter()
+            return { router }
+        },
+
         data() {
             return {
-                testTitle: '',
-                questions: ''
+                testName: ''
             }
         },
+
         methods: {
             handleSubmit() {
-                // Tutaj logika wysyłania formularza
-                const questionsArray = this.questions.split('\n').filter(q => q.trim());
-
-                console.log('Creating test:', {
-                    title: this.testTitle,
-                    questions: questionsArray
-                });
-
-                // Reset formularza
-                this.testTitle = '';
-                this.questions = '';
+                if (this.testName.trim()) {
+                    this.router.push({
+                        name: 'createquestions',
+                        query: { testName: this.testName }
+                    })
+                }
             }
         }
     }
@@ -55,8 +48,8 @@
 
 <style scoped>
     .create-test-page {
-        max-width: 800px;
-        margin: 20px auto;
+        max-width: 600px;
+        margin: 2rem auto;
         padding: 20px;
     }
 
@@ -64,31 +57,21 @@
         margin-bottom: 1.5rem;
     }
 
-    label {
-        display: block;
-        margin-bottom: 0.5rem;
-        font-weight: bold;
-    }
-
-    input[type="text"], textarea {
+    .test-name-input {
         width: 100%;
-        padding: 0.5rem;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+        padding: 0.8rem;
+        border: 2px solid #ddd;
+        border-radius: 8px;
         font-size: 1rem;
     }
 
     .submit-btn {
-        background-color: #42b983;
+        background: #42b983;
         color: white;
-        padding: 0.8rem 1.5rem;
+        padding: 1rem 2rem;
         border: none;
-        border-radius: 4px;
+        border-radius: 8px;
         cursor: pointer;
         font-size: 1rem;
     }
-
-        .submit-btn:hover {
-            background-color: #3aa876;
-        }
 </style>

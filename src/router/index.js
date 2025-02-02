@@ -3,7 +3,7 @@ import EmptyLayout from '../layouts/EmptyLayout.vue';
 import MainLayout from '../layouts/MainLayout.vue';
 import HomePage from '../components/HomePage.vue';
 import CreateTest from '../components/CreateTestPage.vue';
-
+import CreateQuestions from '../components/CreateQuestionsPage.vue';
 const routes = [
     // Landing page z EmptyLayout
     {
@@ -28,6 +28,14 @@ const routes = [
                 name: 'createtest',
                 component: CreateTest
             },
+            {
+                path: 'createquestions',
+                name: 'createquestions',
+                component: CreateQuestions,
+                props: (route) => ({
+                    testName: route.query.testName || ''
+                })
+            }
             // Dodaj inne podstrony tutaj
         ]
     }
