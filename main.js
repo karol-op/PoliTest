@@ -1,7 +1,8 @@
 ﻿const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
-const fs = require('fs').promises
+const fs = require('fs').promises;
 let mainWindow;
+
 app.whenReady().then(() => {
     mainWindow = new BrowserWindow({
         width: 800,
@@ -13,33 +14,53 @@ app.whenReady().then(() => {
         }
     });
 
-    // Handler wyboru folderu – otwiera natywny dialog do wyboru katalogu
-    ipcMain.handle('select-folder', async () => {
-        const result = await dialog.showOpenDialog({
-            properties: ['openDirectory']
-        })
-        if (result.canceled || result.filePaths.length === 0) {
-            return null
+    const isDev = process.env.NODE_ENV === 'development';
+
+    ipcMain.handle('list-files', async (event, folderPath) => {
+        try {
+            const files = await fs.readdir(folderPath);
+            return { success: true, files };
+        } catch (error) {
+            console.error('Błąd przy odczycie plików:', error);
+            return { success: false, error: error.message };
         }
-        return result.filePaths[0]
-    })
-    Menu.setApplicationMenu(null);
+    });
 
+    if (isDev) {
+        mainWindow.loadURL('http://localhost:5173'); // Vite domyślnie używa portu 5173
+    } else {
+        mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+    }
 
-    // Handler zapisu pliku – zapisuje plik w podanym folderze
+    ipcMain.handle('select-folder', async () => {
+        const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+        return result.filePaths[0];
+    });
+
     ipcMain.handle('save-file', async (event, { folder, fileName, fileContent }) => {
         try {
-            const filePath = path.join(folder, fileName)
-            await fs.writeFile(filePath, fileContent, 'utf8')
-            return { success: true }
+            const filePath = path.join(folder, fileName);
+            await fs.writeFile(filePath, fileContent, 'utf8');
+            return { success: true };
         } catch (error) {
-            console.error('Error saving file:', error)
-            return { success: false, error: error.message }
+            console.error('Error saving file:', error);
+            return { success: false, error: error.message };
         }
-    })
-
-    // Ładuje aplikację Vue zamiast index.html
-    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+    });
+    ipcMain.handle('electronAPI.readFile', async (event, { folder, fileName }) => {
+        try {
+            const filePath = path.join(folder, fileName);
+            const content = fs.readFileSync(filePath, 'utf-8');
+            return { success: true, content };
+        } catch (error) {
+            console.error('Błąd odczytu pliku:', error);
+            return { success: false, message: 'Błąd odczytu pliku' };
+        }
+    });
+    Menu.setApplicationMenu(null);
 
     app.on('window-all-closed', () => {
         if (process.platform !== 'darwin') {
@@ -47,4 +68,3 @@ app.whenReady().then(() => {
         }
     });
 });
-
