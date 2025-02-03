@@ -25,6 +25,7 @@ app.whenReady().then(() => {
     })
     Menu.setApplicationMenu(null);
 
+
     // Handler zapisu pliku – zapisuje plik w podanym folderze
     ipcMain.handle('save-file', async (event, { folder, fileName, fileContent }) => {
         try {
@@ -36,8 +37,9 @@ app.whenReady().then(() => {
             return { success: false, error: error.message }
         }
     })
+
     // Ładuje aplikację Vue zamiast index.html
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
 
     app.on('window-all-closed', () => {
         if (process.platform !== 'darwin') {

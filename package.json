@@ -25,6 +25,12 @@
     "productName": "PoliTest",
     "win": {
       "target": "nsis"
-    }
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "main.js"
+    ]
   }
+
 }
