@@ -1,6 +1,6 @@
 {
-  "name": "moja-aplikacja",
-  "version": "1.0.0",
+  "name": "politest",
+  "version": "0.0.1",
   "description": "Moja pierwsza aplikacja Electron + Vue + Vite",
   "main": "main.js",
   "scripts": {
