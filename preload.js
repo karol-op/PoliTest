@@ -1,6 +1,6 @@
-﻿// preload.js
-// Możesz tutaj wystawiać API do komunikacji między main a renderer
-window.addEventListener('DOMContentLoaded', () => {
-    // Przykładowy kod
-    console.log('Preload script loaded.');
-});
+﻿const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('electronAPI', {
+    selectFolder: () => ipcRenderer.invoke('select-folder'),
+    saveFile: (data) => ipcRenderer.invoke('save-file', data)
+})
