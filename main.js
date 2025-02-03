@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+﻿const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs').promises
 let mainWindow;
@@ -23,6 +23,7 @@ app.whenReady().then(() => {
         }
         return result.filePaths[0]
     })
+    Menu.setApplicationMenu(null);
 
     // Handler zapisu pliku – zapisuje plik w podanym folderze
     ipcMain.handle('save-file', async (event, { folder, fileName, fileContent }) => {

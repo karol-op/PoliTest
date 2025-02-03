@@ -58,7 +58,7 @@
                             class="remove-btn"
                             type="button"
                             title="Usuń odpowiedź">
-                        🗑 
+                        🗑
                     </button>
                 </div>
                 <div v-if="addAnswerError" class="error-message">
@@ -83,8 +83,13 @@
                 </button>
             </div>
         </form>
-
     </div>
+    <!-- Powiadomienia -->
+    <transition name="fade">
+        <div v-if="notification" :class="['notification', notification.type]">
+            {{ notification.message }}
+        </div>
+    </transition>
 </template>
 
 
@@ -371,6 +376,7 @@
         border-radius: 5px;
         color: white;
         font-weight: bold;
+        z-index: 9999;
     }
 
         .notification.success {
@@ -380,6 +386,7 @@
         .notification.error {
             background: #ff4444;
         }
+
 
     .fade-enter-active,
     .fade-leave-active {
