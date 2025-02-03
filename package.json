@@ -22,7 +22,7 @@
   },
   "build": {
     "appId": "com.twojafirma.mojaaplikacja",
-    "productName": "MojaAplikacja",
+    "productName": "PoliTest",
     "win": {
       "target": "nsis"
     }
