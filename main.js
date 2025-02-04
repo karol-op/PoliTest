@@ -56,6 +56,31 @@ app.whenReady().then(() => {
     }
   });
 
+  // Nowa obsługa wyboru obrazu
+  ipcMain.handle('select-image', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [
+        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] }
+      ]
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    return result.filePaths[0];
+  });
+
+  // Nowa obsługa kopiowania pliku
+  ipcMain.handle('copy-file', async (event, { source, destination }) => {
+    try {
+      await fs.copyFile(source, destination);
+      return { success: true };
+    } catch (error) {
+      console.error('Error copying file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173'); // Vite domyślnie używa portu 5173
   } else {

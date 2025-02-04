@@ -5,5 +5,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   saveFile: (data) => ipcRenderer.invoke('save-file', data),
   listFiles: (folder) => ipcRenderer.invoke('list-files', folder),
-  readFile: (data) => ipcRenderer.invoke('read-file', data)
+  readFile: (data) => ipcRenderer.invoke('read-file', data),
+  // Nowe funkcje:
+  selectImage: () => ipcRenderer.invoke('select-image'),
+  copyFile: (source, destination) => ipcRenderer.invoke('copy-file', { source, destination })
 });

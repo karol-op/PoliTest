@@ -19,6 +19,10 @@
         <div class="test-name-header">
           <h1>Tworzenie pytań</h1>
           <h2 class="test-name">{{ storedTestName }}</h2>
+          <!-- Przycisk "Nowy plik" pojawia się przy edycji -->
+          <button v-if="currentFileName" @click="resetCurrentFile" class="new-file-btn">
+            Nowy plik
+          </button>
         </div>
   
         <!-- Wybór folderu -->
@@ -42,40 +46,65 @@
         <!-- Formularz pytania -->
         <form @submit.prevent="handleSubmit">
           <div class="form-group">
-            <textarea v-model.trim="currentQuestion"
-                      placeholder="Wpisz swoje pytanie"
-                      required
-                      rows="3"
-                      class="question-input"
-                      :class="{ 'input-error': showErrors && !currentQuestion }"></textarea>
+            <textarea
+              v-model.trim="currentQuestion"
+              placeholder="Wpisz swoje pytanie"
+              required
+              rows="3"
+              class="question-input"
+              :class="{ 'input-error': showErrors && !currentQuestion }"
+            ></textarea>
             <span v-if="showErrors && !currentQuestion" class="error-message">
               Pytanie jest wymagane
             </span>
           </div>
   
+          <!-- Sekcja dodawania / modyfikacji zdjęcia -->
+<!-- Sekcja dodawania / modyfikacji zdjęcia -->
+<div class="image-upload">
+  <button type="button" @click="chooseImage" class="image-btn">
+    {{ selectedImage ? 'Zmodyfikuj zdjęcie' : 'Dodaj zdjęcie' }}
+  </button>
+  <span v-if="selectedImage" class="image-name">
+    Wybrano: {{ imageFileName }}
+  </span>
+  <!-- Podgląd obrazka z ograniczeniem rozmiaru -->
+  <div v-if="selectedImage" class="image-preview">
+    <img :src="selectedImage" alt="Podgląd zdjęcia" />
+  </div>
+</div>
+  
           <!-- Sekcja odpowiedzi -->
           <div class="answers-section">
             <h3>Odpowiedzi:</h3>
-            <div v-for="(answer, index) in answers"
-                 :key="index"
-                 class="answer-item">
-              <input type="text"
-                     v-model.trim="answer.text"
-                     placeholder="Wpisz odpowiedź"
-                     class="answer-input"
-                     :class="{ 'input-error': showErrors && !answer.text }"
-                     @input="clearAddError" />
+            <div
+              v-for="(answer, index) in answers"
+              :key="index"
+              class="answer-item"
+            >
+              <input
+                type="text"
+                v-model.trim="answer.text"
+                placeholder="Wpisz odpowiedź"
+                class="answer-input"
+                :class="{ 'input-error': showErrors && !answer.text }"
+                @input="clearAddError"
+              />
               <label class="correct-label">
-                <input type="checkbox"
-                       v-model="answer.isCorrect"
-                       class="correct-checkbox" />
+                <input
+                  type="checkbox"
+                  v-model="answer.isCorrect"
+                  class="correct-checkbox"
+                />
                 Poprawna
               </label>
-              <button v-if="answers.length > 1"
-                      @click="confirmRemove(index)"
-                      class="remove-btn"
-                      type="button"
-                      title="Usuń odpowiedź">
+              <button
+                v-if="answers.length > 1"
+                @click="confirmRemove(index)"
+                class="remove-btn"
+                type="button"
+                title="Usuń odpowiedź"
+              >
                 🗑
               </button>
             </div>
@@ -91,13 +120,14 @@
   
           <!-- Przyciski akcji -->
           <div class="button-group">
-            <button type="button"
-                    @click="addAnswer"
-                    class="add-answer-btn"
-                    :disabled="addAnswerPending">
+            <button
+              type="button"
+              @click="addAnswer"
+              class="add-answer-btn"
+              :disabled="addAnswerPending"
+            >
               ➕ Dodaj odpowiedź
             </button>
-  
             <button type="submit" class="submit-btn">
               💾 Zapisz pytanie
             </button>
@@ -116,6 +146,7 @@
   
   <script>
   import { useRoute } from "vue-router";
+  import path from "path";
   
   export default {
     setup() {
@@ -134,11 +165,17 @@
         notification: null,
         files: [], // lista plików w folderze
         currentFileName: null, // nazwa wczytanego pliku, jeśli edytujemy
+        selectedImage: null, // pełna ścieżka do wybranego obrazu
       };
     },
     computed: {
       storedTestName() {
         return this.sanitize(this.route.query.testName || "nienazwany_test");
+      },
+      imageFileName() {
+        if (!this.selectedImage) return "";
+        const parts = this.selectedImage.split(/[\\/]/);
+        return parts[parts.length - 1];
       },
       hasValidAnswers() {
         return this.answers.some((a) => a.text.trim() !== "");
@@ -186,7 +223,7 @@
         try {
           const result = await window.electronAPI.listFiles(this.selectedFolder);
           if (result.success) {
-            this.files = result.files.filter(file => file.endsWith('.txt'));
+            this.files = result.files.filter((file) => file.endsWith(".txt"));
           } else {
             this.showNotification("Nie udało się wczytać plików", "error");
           }
@@ -207,7 +244,10 @@
           return;
         }
         try {
-          const result = await window.electronAPI.readFile({ folder: this.selectedFolder, fileName });
+          const result = await window.electronAPI.readFile({
+            folder: this.selectedFolder,
+            fileName,
+          });
           if (result.success) {
             const content = result.content;
             const lines = content.split("\n");
@@ -217,29 +257,31 @@
             }
             // Pierwsza linia – marker, np. "X1110"
             const marker = lines[0].trim();
-            // Druga linia – pytanie
-            const questionText = lines[1].trim();
-            // Kolejne linie – odpowiedzi
-            const answersText = lines.slice(2);
   
-            // Ustawienie pytania
-            this.currentQuestion = questionText;
+            if (lines[1].startsWith("[img]")) {
+              // Drugi wiersz – tag obrazu
+              // Ustawiamy nazwę obrazka oraz czyścimy pełną ścieżkę (lub możesz ustawić ją inaczej)
+              this.selectedImage = null;
+              // Trzeci wiersz – pytanie, kolejne – odpowiedzi
+              this.currentQuestion = lines[2].trim();
+              const answersText = lines.slice(3);
+              const bits = marker.slice(1).split("");
   
-            // Sprawdzenie poprawności markera (musi zaczynać się od "X")
-            if (marker[0] !== 'X') {
-              this.showNotification("Plik nie ma poprawnego formatu (brak X na początku markera)", "error");
-              return;
+              this.answers = answersText.map((text, index) => ({
+                text: text.trim(),
+                isCorrect: bits[index] === "1",
+              }));
+            } else {
+              // Brak obrazu – tradycyjny format
+              this.currentQuestion = lines[1].trim();
+              const answersText = lines.slice(2);
+              const bits = marker.slice(1).split("");
+  
+              this.answers = answersText.map((text, index) => ({
+                text: text.trim(),
+                isCorrect: bits[index] === "1",
+              }));
             }
-            const bits = marker.slice(1).split(""); // np. ["1", "1", "1", "0"]
-  
-  
-            // Ustawienie tablicy odpowiedzi
-            this.answers = answersText.map((text, index) => ({
-              text: text.trim(),
-              isCorrect: bits[index] === '1'
-            }));
-  
-            // Ustawienie aktualnie edytowanego pliku
             this.currentFileName = fileName;
             this.showNotification("Plik wczytany poprawnie", "success");
           } else {
@@ -250,6 +292,18 @@
           this.showNotification("Błąd przy wczytywaniu pliku", "error");
         }
       },
+      async chooseImage() {
+        try {
+          const imagePath = await window.electronAPI.selectImage();
+          if (imagePath) {
+            this.selectedImage = imagePath;
+            this.showNotification("Zdjęcie wybrane", "success");
+          }
+        } catch (error) {
+          console.error("Błąd przy wybieraniu zdjęcia:", error);
+          this.showNotification("Błąd przy wybieraniu zdjęcia", "error");
+        }
+      },
       async handleSubmit() {
         if (!this.validateForm()) return;
         if (!this.selectedFolder) {
@@ -257,22 +311,33 @@
           return;
         }
   
-        // Jeśli edytujemy istniejący plik, zachowujemy jego nazwę, w przeciwnym razie tworzymy nową nazwę
-        const fileName = this.currentFileName || (() => {
-          const correctMarker = "X" + this.answers.map(a => (a.isCorrect ? "1" : "0")).join("");
-          return `${this.sanitize(this.currentQuestion).substring(0, 20)}_${correctMarker}.txt`;
-        })();
+        const fileName =
+          this.currentFileName ||
+          (() => {
+            const correctMarker =
+              "X" + this.answers.map((a) => (a.isCorrect ? "1" : "0")).join("");
+            return `${this.sanitize(this.currentQuestion).substring(0, 20)}.txt`;
+          })();
   
-        // Przygotowanie zawartości pliku (format: marker, pytanie, odpowiedzi)
-        const correctMarker = "X" + this.answers.map(a => (a.isCorrect ? "1" : "0")).join("");
-        const fileContent = [
-          correctMarker,
-          this.currentQuestion,
-          ...this.answers.map(a => a.text.trim())
-        ].join("\n");
+        let fileContent = "";
+        const correctMarker =
+          "X" + this.answers.map((a) => (a.isCorrect ? "1" : "0")).join("");
+        if (this.selectedImage) {
+          fileContent = [
+            correctMarker,
+            `[img]${this.imageFileName}[/img]`,
+            this.currentQuestion,
+            ...this.answers.map((a) => a.text.trim()),
+          ].join("\n");
+        } else {
+          fileContent = [
+            correctMarker,
+            this.currentQuestion,
+            ...this.answers.map((a) => a.text.trim()),
+          ].join("\n");
+        }
   
         try {
-          // Zapis pytania (nowy plik lub nadpisanie istniejącego)
           const result = await window.electronAPI.saveFile({
             folder: this.selectedFolder,
             fileName,
@@ -290,28 +355,49 @@
           this.showNotification("Nie udało się zapisać pliku.", "error");
           return;
         }
-        
-        // Dodatkowy zapis: utworzenie/aktualizacja pliku testname.txt
+  
+        if (this.selectedImage) {
+          try {
+            const destination = this.selectedFolder + "/" + this.imageFileName;
+            const copyResult = await window.electronAPI.copyFile(
+              this.selectedImage,
+              destination
+            );
+            if (!copyResult.success) {
+              this.showNotification(
+                "Pytanie zapisane, ale nie udało się skopiować zdjęcia",
+                "error"
+              );
+            }
+          } catch (error) {
+            console.error("Błąd podczas kopiowania zdjęcia:", error);
+          }
+        }
+  
         try {
           const testNameResult = await window.electronAPI.saveFile({
             folder: this.selectedFolder,
             fileName: "testname.txt",
-            fileContent: this.storedTestName
+            fileContent: this.storedTestName,
           });
           if (!testNameResult.success) {
-            this.showNotification("Pytanie zapisane, ale nie udało się zapisać testname.txt", "error");
+            this.showNotification(
+              "Pytanie zapisane, ale nie udało się zapisać testname.txt",
+              "error"
+            );
           }
         } catch (error) {
           console.error("Błąd podczas zapisu testname.txt:", error);
         }
-        
-        // Reset formularza i zmiennej currentFileName
+  
         this.resetForm();
         this.currentFileName = null;
+        this.selectedImage = null;
       },
       addAnswer() {
         if (!this.allAnswersFilled) {
-          this.addAnswerError = "Wypełnij wszystkie istniejące odpowiedzi przed dodaniem nowej";
+          this.addAnswerError =
+            "Wypełnij wszystkie istniejące odpowiedzi przed dodaniem nowej";
           this.addAnswerPending = true;
           setTimeout(() => {
             this.addAnswerError = null;
@@ -345,6 +431,12 @@
         this.currentQuestion = "";
         this.answers = [{ text: "", isCorrect: false }];
         this.showErrors = false;
+      },
+      resetCurrentFile() {
+        // Reset formularza oraz usunięcie trybu edycji
+        this.resetForm();
+        this.currentFileName = null;
+        this.selectedImage = null;
       },
       showNotification(message, type) {
         this.notification = { message, type };
@@ -417,10 +509,22 @@
     padding-bottom: 1rem;
     border-bottom: 2px solid #eee;
     text-align: center;
+    position: relative;
   }
   .test-name {
     color: #42b983;
     margin-top: 0.5rem;
+  }
+  .new-file-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: #2196f3;
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
   }
   .folder-section {
     margin-bottom: 1.5rem;
@@ -447,6 +551,33 @@
     resize: none;
     text-align: center;
   }
+  .image-upload {
+    margin: 1rem 0;
+    text-align: center;
+  }
+  .image-btn {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    color: white;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 1rem;
+  }
+  .image-name {
+    font-style: italic;
+    font-size: 0.9rem;
+    display: block;
+    margin-top: 0.5rem;
+  }
+  .image-preview img {
+  max-width: 100%;
+  max-height: 200px;
+  margin-top: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
   .answers-section {
     margin: 2rem 0;
   }

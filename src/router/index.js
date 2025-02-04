@@ -3,6 +3,7 @@ import EmptyLayout from '../layouts/EmptyLayout.vue';
 import MainLayout from '../layouts/MainLayout.vue';
 import HomePage from '../components/HomePage.vue';
 import CreateTest from '../components/CreateTestPage.vue';
+import TestSelection from '../components/TestSelection.vue';
 import CreateQuestions from '../components/CreateQuestionsPage.vue';
 const routes = [
     // Landing page z EmptyLayout
@@ -27,6 +28,11 @@ const routes = [
                 path: 'createtest',
                 name: 'createtest',
                 component: CreateTest
+            },
+            {
+                path: 'testselection',
+                name: 'testselection',
+                component: TestSelection
             },
             {
                 path: 'createquestions',
