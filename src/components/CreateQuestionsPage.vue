@@ -231,11 +231,7 @@
               return;
             }
             const bits = marker.slice(1).split(""); // np. ["1", "1", "1", "0"]
-  
-            if (bits.length !== answersText.length) {
-              this.showNotification("Ilość odpowiedzi nie zgadza się z danymi w markerze", "error");
-              return;
-            }
+
   
             // Ustawienie tablicy odpowiedzi
             this.answers = answersText.map((text, index) => ({
