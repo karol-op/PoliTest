@@ -133,7 +133,7 @@
         folderError: "",
         notification: null,
         files: [], // lista plików w folderze
-        currentFileName: null, // przechowuje nazwę wczytanego pliku (jeśli edytujemy)
+        currentFileName: null, // nazwa wczytanego pliku, jeśli edytujemy
       };
     },
     computed: {
@@ -222,7 +222,7 @@
             // Kolejne linie – odpowiedzi
             const answersText = lines.slice(2);
   
-            // Ustaw pytanie
+            // Ustawienie pytania
             this.currentQuestion = questionText;
   
             // Sprawdzenie poprawności markera (musi zaczynać się od "X")
@@ -231,7 +231,7 @@
               return;
             }
             const bits = marker.slice(1).split(""); // np. ["1", "1", "1", "0"]
-
+  
   
             // Ustawienie tablicy odpowiedzi
             this.answers = answersText.map((text, index) => ({
@@ -257,13 +257,13 @@
           return;
         }
   
-        // Jeśli edytujemy istniejący plik, zachowujemy jego nazwę
+        // Jeśli edytujemy istniejący plik, zachowujemy jego nazwę, w przeciwnym razie tworzymy nową nazwę
         const fileName = this.currentFileName || (() => {
           const correctMarker = "X" + this.answers.map(a => (a.isCorrect ? "1" : "0")).join("");
           return `${this.sanitize(this.currentQuestion).substring(0, 20)}_${correctMarker}.txt`;
         })();
   
-        // Przygotowanie zawartości pliku
+        // Przygotowanie zawartości pliku (format: marker, pytanie, odpowiedzi)
         const correctMarker = "X" + this.answers.map(a => (a.isCorrect ? "1" : "0")).join("");
         const fileContent = [
           correctMarker,
@@ -272,6 +272,7 @@
         ].join("\n");
   
         try {
+          // Zapis pytania (nowy plik lub nadpisanie istniejącego)
           const result = await window.electronAPI.saveFile({
             folder: this.selectedFolder,
             fileName,
@@ -282,11 +283,29 @@
             this.showNotification("Pytanie zapisane pomyślnie!", "success");
           } else {
             this.showNotification("Nie udało się zapisać pliku.", "error");
+            return;
           }
         } catch (error) {
           console.error("Błąd podczas zapisu pliku:", error);
           this.showNotification("Nie udało się zapisać pliku.", "error");
+          return;
         }
+        
+        // Dodatkowy zapis: utworzenie/aktualizacja pliku testname.txt
+        try {
+          const testNameResult = await window.electronAPI.saveFile({
+            folder: this.selectedFolder,
+            fileName: "testname.txt",
+            fileContent: this.storedTestName
+          });
+          if (!testNameResult.success) {
+            this.showNotification("Pytanie zapisane, ale nie udało się zapisać testname.txt", "error");
+          }
+        } catch (error) {
+          console.error("Błąd podczas zapisu testname.txt:", error);
+        }
+        
+        // Reset formularza i zmiennej currentFileName
         this.resetForm();
         this.currentFileName = null;
       },
