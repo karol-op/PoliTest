@@ -2,7 +2,6 @@
 const path = require('path');
 const fs = require('fs').promises;
 let mainWindow;
-
 app.whenReady().then(() => {
   mainWindow = new BrowserWindow({
     width: 800,
@@ -85,6 +84,7 @@ app.whenReady().then(() => {
     mainWindow.loadURL('http://localhost:5173'); // Vite domyślnie używa portu 5173
   } else {
     mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+    mainWindow.webContents.toggleDevTools();
   }
 
   Menu.setApplicationMenu(null);
