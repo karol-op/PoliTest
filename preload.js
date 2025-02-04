@@ -2,8 +2,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-    selectFolder: () => ipcRenderer.invoke('select-folder'),
-    saveFile: (data) => ipcRenderer.invoke('save-file', data),
-    listFiles: (folder) => ipcRenderer.invoke('list-files', folder)
+  selectFolder: () => ipcRenderer.invoke('select-folder'),
+  saveFile: (data) => ipcRenderer.invoke('save-file', data),
+  listFiles: (folder) => ipcRenderer.invoke('list-files', folder),
+  readFile: (data) => ipcRenderer.invoke('read-file', data)
 });
-
