@@ -13,6 +13,9 @@
             <button type="submit" class="submit-btn">
                 Przejdź do tworzenia pytań
             </button>
+            <RouterLink to="/" class="btn">
+                Wróć
+            </RouterLink>
         </form>
     </div>
 </template>
