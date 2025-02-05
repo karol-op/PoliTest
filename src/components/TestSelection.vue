@@ -13,6 +13,9 @@
             <button type="submit" class="submit-btn">
                 Przejdź do tworzenia pytań
             </button>
+                      <button type="button" @click="goBack" class="back-btn">
+            ← Wróć
+          </button>
         </form>
     </div>
 </template>

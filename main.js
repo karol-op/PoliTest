@@ -84,7 +84,6 @@ app.whenReady().then(() => {
     mainWindow.loadURL('http://localhost:5173'); // Vite domyślnie używa portu 5173
   } else {
     mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
-    mainWindow.webContents.toggleDevTools();
   }
 
   Menu.setApplicationMenu(null);

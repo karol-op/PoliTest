@@ -11,6 +11,10 @@
         </li>
       </ul>
       <p v-else class="no-files">Brak plików w folderze</p>
+      <!-- Przycisk "Nowy plik" umieszczony na dole sekcji listy plików -->
+      <button v-if="currentFileName" @click="resetCurrentFile" class="new-file-btn">
+        Nowy plik
+      </button>
     </div>
 
     <!-- Główny formularz -->
@@ -18,9 +22,6 @@
       <div class="test-name-header">
         <h1>Tworzenie pytań</h1>
         <h2 class="test-name">{{ storedTestName }}</h2>
-        <button v-if="currentFileName" @click="resetCurrentFile" class="new-file-btn">
-          Nowy plik
-        </button>
       </div>
 
       <!-- Wybór folderu i zdjęcia -->
@@ -71,6 +72,10 @@
           </span>
           <div class="image-preview">
             <img :src="selectedImage" alt="Podgląd zdjęcia" />
+            <!-- Czerwony przycisk z ikoną kosza do usunięcia zdjęcia -->
+            <button type="button" @click="removeImage" class="remove-btn image-remove-btn" title="Usuń zdjęcie">
+              🗑
+            </button>
           </div>
         </div>
 
@@ -120,23 +125,23 @@
 
         <!-- Przyciski akcji -->
         <div class="button-group">
-    <div class="action-buttons">
-      <button
-        type="button"
-        @click="addAnswer"
-        class="add-answer-btn"
-        :disabled="addAnswerPending"
-      >
-        ➕ Dodaj odpowiedź
-      </button>
-      <button type="submit" class="submit-btn">
-        💾 Zapisz pytanie
-      </button>
-    </div>
-    <button type="button" @click="goBack" class="back-btn">
-      ← Wróć
-    </button>
-  </div>
+          <div class="action-buttons">
+            <button
+              type="button"
+              @click="addAnswer"
+              class="add-answer-btn"
+              :disabled="addAnswerPending"
+            >
+              ➕ Dodaj odpowiedź
+            </button>
+            <button type="submit" class="submit-btn">
+              💾 Zapisz pytanie
+            </button>
+          </div>
+          <button type="button" @click="goBack" class="back-btn">
+            ← Wróć
+          </button>
+        </div>
       </form>
     </div>
 
@@ -151,10 +156,10 @@
 
 <script>
 import { useRoute } from "vue-router";
-import path from "path";
 
 export default {
   setup() {
+    // Pobranie bieżącej trasy (route)
     const route = useRoute();
     return { route };
   },
@@ -174,20 +179,25 @@ export default {
     };
   },
   computed: {
+    // Zwraca nazwę testu po usunięciu znaków specjalnych
     storedTestName() {
       return this.sanitize(this.route.query.testName || "nienazwany_test");
     },
+    // Wyciąga nazwę pliku obrazu z pełnej ścieżki
     imageFileName() {
       if (!this.selectedImage) return "";
       const parts = this.selectedImage.split(/[\\/]/);
       return parts[parts.length - 1];
     },
+    // Sprawdza, czy przynajmniej jedna odpowiedź ma tekst
     hasValidAnswers() {
       return this.answers.some((a) => a.text.trim() !== "");
     },
+    // Sprawdza, czy przynajmniej jedna odpowiedź jest oznaczona jako poprawna
     hasCorrectAnswer() {
       return this.answers.some((a) => a.isCorrect);
     },
+    // Sprawdza, czy formularz jest poprawnie wypełniony
     isFormValid() {
       return (
         this.currentQuestion.trim() !== "" &&
@@ -195,11 +205,13 @@ export default {
         this.hasCorrectAnswer
       );
     },
+    // Sprawdza, czy wszystkie odpowiedzi są wypełnione
     allAnswersFilled() {
       return this.answers.every((a) => a.text.trim() !== "");
     },
   },
   methods: {
+    // Usuwa znaki specjalne z tekstu, używane przy generowaniu nazw plików
     sanitize(text) {
       return text
         .normalize("NFD")
@@ -209,18 +221,18 @@ export default {
         .replace(/[^a-z0-9_]/g, "")
         .substring(0, 50);
     },
+    // Nawigacja do poprzedniej strony
     goBack() {
-      this.$router.go(-1); // Lub inna logika nawigacji
+      this.$router.go(-1); // Cofnięcie o jedną stronę w historii
     },
-
-
+    // Wybór folderu do zapisu
     async selectFolder() {
       try {
         const folderPath = await window.electronAPI.selectFolder();
         if (folderPath) {
           this.selectedFolder = folderPath;
           this.folderError = "";
-          await this.fetchFiles();
+          await this.fetchFiles(); // Po wyborze folderu wczytuje listę plików
         } else {
           this.folderError = "Nie wybrano folderu";
         }
@@ -228,6 +240,7 @@ export default {
         this.folderError = "Nie udało się wybrać folderu.";
       }
     },
+    // Pobiera listę plików (tylko .txt) z wybranego folderu
     async fetchFiles() {
       if (!this.selectedFolder) return;
       try {
@@ -242,12 +255,14 @@ export default {
         this.showNotification("Błąd pobierania plików", "error");
       }
     },
+    // Zmiana folderu – resetuje wybrane dane i formularz
     changeFolder() {
       this.selectedFolder = null;
       this.files = [];
       this.currentFileName = null;
       this.resetForm();
     },
+    // Wczytuje zawartość pliku i ustawia dane formularza
     async loadFile(fileName) {
       if (!this.selectedFolder) {
         this.showNotification("Wybierz folder zapisu!", "error");
@@ -258,45 +273,45 @@ export default {
           folder: this.selectedFolder,
           fileName,
         });
-        if (result.success) {
-          const content = result.content;
-          const lines = content.split("\n");
-          if (lines.length < 2) {
-            this.showNotification("Plik jest niepoprawny", "error");
-            return;
-          }
-          const marker = lines[0].trim();
-
-          if (lines[1].startsWith("[img]")) {
-            this.selectedImage = null;
-            this.currentQuestion = lines[2].trim();
-            const answersText = lines.slice(3);
-            const bits = marker.slice(1).split("");
-
-            this.answers = answersText.map((text, index) => ({
-              text: text.trim(),
-              isCorrect: bits[index] === "1",
-            }));
-          } else {
-            this.currentQuestion = lines[1].trim();
-            const answersText = lines.slice(2);
-            const bits = marker.slice(1).split("");
-
-            this.answers = answersText.map((text, index) => ({
-              text: text.trim(),
-              isCorrect: bits[index] === "1",
-            }));
-          }
-          this.currentFileName = fileName;
-          this.showNotification("Plik wczytany poprawnie", "success");
-        } else {
+        if (!result.success) {
           this.showNotification("Nie udało się wczytać pliku", "error");
+          return;
         }
+        const content = result.content;
+        const lines = content.split("\n");
+        if (lines.length < 2) {
+          this.showNotification("Plik jest niepoprawny", "error");
+          return;
+        }
+        // Pobranie markera z pierwszej linii
+        const marker = lines[0].trim();
+        // Jeśli druga linia zawiera znacznik obrazu, wyodrębniamy nazwę obrazu
+        let offset = 1;
+        if (lines[1].startsWith("[img]")) {
+          const imgLine = lines[1].trim();
+          const imgFileName = imgLine.substring(5, imgLine.length - 6); // Usuwamy [img] oraz [/img]
+          // Ustawiamy obraz – zakładamy, że obraz znajduje się w wybranym folderze
+          this.selectedImage = this.selectedFolder + "/" + imgFileName;
+          offset = 2;
+        } else {
+          this.selectedImage = null;
+        }
+        // Ustawienie pytania oraz listy odpowiedzi
+        this.currentQuestion = lines[offset].trim();
+        const answersText = lines.slice(offset + 1);
+        const bits = marker.slice(1).split("");
+        this.answers = answersText.map((text, index) => ({
+          text: text.trim(),
+          isCorrect: bits[index] === "1",
+        }));
+        this.currentFileName = fileName;
+        this.showNotification("Plik wczytany poprawnie", "success");
       } catch (error) {
         console.error("Błąd przy wczytywaniu pliku:", error);
         this.showNotification("Błąd przy wczytywaniu pliku", "error");
       }
     },
+    // Wybór zdjęcia (ścieżka do pliku obrazu)
     async chooseImage() {
       try {
         const imagePath = await window.electronAPI.selectImage();
@@ -309,28 +324,31 @@ export default {
         this.showNotification("Błąd przy wybieraniu zdjęcia", "error");
       }
     },
+    // Usuwa zdjęcie z pytania
+    removeImage() {
+      this.selectedImage = null;
+      this.showNotification("Zdjęcie usunięte", "success");
+    },
+    // Zapisuje pytanie do pliku oraz wykonuje kopiowanie zdjęcia i zapis nazwy testu
     async handleSubmit() {
       if (!this.validateForm()) return;
       if (!this.selectedFolder) {
         this.showNotification("Wybierz folder zapisu!", "error");
         return;
       }
-
+      // Obliczenie markera poprawności odpowiedzi
+      const correctMarker = "X" + this.answers.map((a) => (a.isCorrect ? "1" : "0")).join("");
+      // Jeśli nie wczytano pliku, generujemy nazwę na podstawie pytania
       const fileName =
         this.currentFileName ||
-        (() => {
-          const correctMarker =
-            "X" + this.answers.map((a) => (a.isCorrect ? "1" : "0")).join("");
-          return `${this.sanitize(this.currentQuestion).substring(0, 20)}.txt`;
-        })();
+        `${this.sanitize(this.currentQuestion).substring(0, 20)}.txt`;
 
+      // Przygotowanie zawartości pliku
       let fileContent = "";
-      const correctMarker =
-        "X" + this.answers.map((a) => (a.isCorrect ? "1" : "0")).join("");
       if (this.selectedImage) {
         fileContent = [
           correctMarker,
-          `[img]${this.imageFileName}[/img]`,
+          "[img]" + this.imageFileName + "[/img]",
           this.currentQuestion,
           ...this.answers.map((a) => a.text.trim()),
         ].join("\n");
@@ -342,6 +360,7 @@ export default {
         ].join("\n");
       }
 
+      // Zapis pliku z pytaniem
       try {
         const result = await window.electronAPI.saveFile({
           folder: this.selectedFolder,
@@ -361,6 +380,7 @@ export default {
         return;
       }
 
+      // Jeśli wybrano zdjęcie, kopiujemy je do folderu docelowego
       if (this.selectedImage) {
         try {
           const destination = this.selectedFolder + "/" + this.imageFileName;
@@ -379,6 +399,7 @@ export default {
         }
       }
 
+      // Zapis nazwy testu do pliku testname.txt
       try {
         const testNameResult = await window.electronAPI.saveFile({
           folder: this.selectedFolder,
@@ -395,10 +416,12 @@ export default {
         console.error("Błąd podczas zapisu testname.txt:", error);
       }
 
+      // Reset formularza i usunięcie wybranych plików/zdjęcia
       this.resetForm();
       this.currentFileName = null;
       this.selectedImage = null;
     },
+    // Dodaje nową pustą odpowiedź
     addAnswer() {
       if (!this.allAnswersFilled) {
         this.addAnswerError =
@@ -414,34 +437,41 @@ export default {
       this.addAnswerError = null;
       this.addAnswerPending = false;
     },
+    // Pyta o potwierdzenie usunięcia odpowiedzi, a następnie usuwa
     confirmRemove(index) {
       if (confirm("Czy na pewno chcesz usunąć tę odpowiedź?")) {
         this.removeAnswer(index);
       }
     },
+    // Usuwa odpowiedź o podanym indeksie (o ile pozostała przynajmniej jedna)
     removeAnswer(index) {
       if (this.answers.length > 1) {
         this.answers.splice(index, 1);
       }
     },
+    // Czyści błąd przy dodawaniu odpowiedzi
     clearAddError() {
       this.addAnswerError = null;
       this.addAnswerPending = false;
     },
+    // Walidacja formularza – ustawia flagę wyświetlania błędów
     validateForm() {
       this.showErrors = true;
       return this.isFormValid;
     },
+    // Resetuje dane formularza (pytanie oraz odpowiedzi)
     resetForm() {
       this.currentQuestion = "";
       this.answers = [{ text: "", isCorrect: false }];
       this.showErrors = false;
     },
+    // Resetuje bieżący plik i formularz oraz usuwa wybrane zdjęcie
     resetCurrentFile() {
       this.resetForm();
       this.currentFileName = null;
       this.selectedImage = null;
     },
+    // Wyświetla powiadomienie na określony czas
     showNotification(message, type) {
       this.notification = { message, type };
       setTimeout(() => {
@@ -453,6 +483,7 @@ export default {
 </script>
 
 <style scoped>
+/* Stylowanie komponentu – niezmienione względem oryginału */
 
 .button-group {
   display: flex;
@@ -592,29 +623,27 @@ export default {
   background-color: #505050;
 }
 
-.test-name-header {
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid #eee;
-  text-align: center;
-  position: relative;
-}
-
 .new-file-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
   background: #2196f3;
   color: #fff;
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 6px;
   cursor: pointer;
+  margin-top: auto;
   transition: transform 0.2s;
 }
 
 .new-file-btn:hover {
   transform: scale(1.05);
+}
+
+.test-name-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #eee;
+  text-align: center;
+  position: relative;
 }
 
 .question-input {
@@ -633,12 +662,25 @@ export default {
   text-align: center;
 }
 
+.image-preview {
+  position: relative;
+}
+
+/* Ograniczenie maksymalnych rozmiarów podglądu zdjęcia */
 .image-preview img {
-  max-width: 100%;
-  max-height: 200px;
+  max-width: 250px;
+  max-height: 250px;
   margin-top: 0.5rem;
   border: 1px solid #ddd;
   border-radius: 4px;
+}
+
+/* Przycisk usuwania zdjęcia – wycentrowany wertykalnie w swoim kontenerze */
+.image-remove-btn {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
 }
 
 .answers-section {
@@ -680,8 +722,6 @@ export default {
   margin-top: 0.5rem;
   text-align: center;
 }
-
-
 
 .add-answer-btn,
 .submit-btn {
@@ -730,15 +770,10 @@ export default {
   z-index: 9999;
 }
 .notification.success {
-
-background: #42b983;
-
+  background: #42b983;
 }
-
 .notification.error {
-
-background: #ff4444;
-
+  background: #ff4444;
 }
 .fade-enter-active,
 .fade-leave-active {
@@ -754,7 +789,6 @@ background: #ff4444;
   margin-bottom: 0.5rem;
   transition: transform 0.2s;
 }
-
 .folder-btn:hover {
   transform: scale(1.05);
 }
