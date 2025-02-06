@@ -26,7 +26,13 @@
     <div class="form-container">
       <div class="test-name-header">
         <h1>Tworzenie pytań</h1>
-        <h2 class="test-name">{{ storedTestName }}</h2>
+        <h2 class="test-name">
+          <span v-if="!editingTestName">{{ storedTestName }}</span>
+          <input v-else type="text" v-model="testName" class="test-name-input-inline" />
+          <button @click="toggleEditTestName" class="edit-test-name-btn" title="Edytuj nazwę testu">
+            ✎
+          </button>
+        </h2>
       </div>
 
       <!-- Wybór folderu i zdjęcia -->
@@ -40,7 +46,7 @@
         <div v-else class="selected-folder-container">
           <div class="selected-folder-display">
             <p class="selected-folder">
-              📁 Wybrana lokalizacja: <strong>{{ selectedFolder }}</strong>
+              📁 Wybrana lokalizacija: <strong>{{ selectedFolder }}</strong>
             </p>
             <button @click="changeFolder" class="reload-button" title="Zmień folder">
               🔄
@@ -75,7 +81,6 @@
           >
             ?
           </button>
-
           <span v-if="showErrors && !currentQuestion" class="error-message">
             Pytanie jest wymagane
           </span>
@@ -182,7 +187,10 @@
     <!-- Popup do edycji wyjaśnień -->
     <div v-if="explanationPopup.show" class="explanation-popup-overlay">
       <div class="explanation-popup">
-        <h3>Wyjaśnienie: {{ explanationPopup.type === 'question' ? 'Pytania' : 'Odpowiedzi' }}</h3>
+        <h3>
+          Wyjaśnienie: 
+          {{ explanationPopup.type === 'question' ? currentQuestion : (explanationPopup.answerIndex !== null ? answers[explanationPopup.answerIndex].text : '') }}
+        </h3>
         <textarea v-model="popupExplanationText" placeholder="Wpisz wyjaśnienie"></textarea>
         <div class="popup-actions">
           <button @click="saveExplanation" class="popup-save-btn">Zapisz</button>
@@ -228,7 +236,8 @@ export default {
         answerIndex: null,
       },
       popupExplanationText: "",
-      testName: ""
+      testName: "",
+      editingTestName: false
     };
   },
   computed: {
@@ -292,6 +301,9 @@ export default {
         .replace(/\s+/g, "_")
         .replace(/[^a-z0-9_]/g, "")
         .substring(0, 50);
+    },
+    toggleEditTestName() {
+      this.editingTestName = !this.editingTestName;
     },
     goBack() {
       this.$router.go(-1);
@@ -622,17 +634,16 @@ export default {
   margin: 0;
 }
 
+/* Zmodyfikowany przycisk do wprowadzania explanations – przesunięty do wewnątrz inputu */
 .exp-btn {
   background: none;
   border: none;
   cursor: pointer;
   font-size: 1rem;
   padding: 0;
-  line-height: 1;
   position: absolute;
-  right: -18px;
-  top: 50%;
-  transform: translateY(-50%);
+  right: 10px;
+  top: 10px;
 }
 
 .exp-btn-green {
@@ -863,6 +874,31 @@ export default {
   border-bottom: 2px solid #eee;
   text-align: center;
   position: relative;
+}
+
+.test-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.test-name-input-inline {
+  font-size: 1.5rem;
+  text-align: center;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px;
+  background: #fff;
+  color: #000;
+}
+
+.edit-test-name-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #42b983;
 }
 
 .question-input {
