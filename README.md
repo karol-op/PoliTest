@@ -2,10 +2,11 @@
 To-do:
 
 NA TERAZ:
--przycisk do usuwania zdjecia
+-delete .txt file button in test creation page
+-testname should not pop up in test creation page
 -wylaczyc devtoolsy w main.js
--w createtest page dac przycisk powrotu
+-przycisk otworz test powinien sie nazywac "wczytaj test", po jego kliknieciu program powinien w pop-upie zapytac czy chcemy rozpoczac z niego quiz czy go zmodyfikowac. 
+-"ostatnio otwierane testy" powinno sie zmienic na "ostatnio uruchamiane quizy"
 POZNIEJ:
 -wyjasnianie pytan
--Cofniecie sie do poprzedniego pytania, ale bez mozliwosci zmienienia wyboru
 -żeby było widac poprawna odpowiedz w typu y (jak bedzie quiz)
