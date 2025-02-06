@@ -38,20 +38,20 @@
           <p v-if="folderError" class="error-message">{{ folderError }}</p>
         </div>
         <div v-else class="selected-folder-container">
-    <div class="selected-folder-display">
-      <p class="selected-folder">
-        📁 Wybrana lokalizacja: <strong>{{ selectedFolder }}</strong>
-      </p>
-      <button @click="changeFolder" class="reload-button" title="Zmień folder">
-        🔄
-      </button>
-    </div>
-    <div class="image-upload" v-if="!selectedImage">
-      <button type="button" @click="chooseImage" class="image-btn">
-        Dodaj zdjęcie
-      </button>
-    </div>
-  </div>
+          <div class="selected-folder-display">
+            <p class="selected-folder">
+              📁 Wybrana lokalizacja: <strong>{{ selectedFolder }}</strong>
+            </p>
+            <button @click="changeFolder" class="reload-button" title="Zmień folder">
+              🔄
+            </button>
+          </div>
+          <div class="image-upload" v-if="!selectedImage">
+            <button type="button" @click="chooseImage" class="image-btn">
+              Dodaj zdjęcie
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Formularz pytania -->
@@ -67,38 +67,38 @@
             :class="{ 'input-error': showErrors && !currentQuestion }"
           ></textarea>
           <button
-    type="button"
-    class="exp-btn"
-    @click="openExplanationPopup('question')"
-    :class="{'exp-btn-green': questionExplanation.trim(), 'exp-btn-red': !questionExplanation.trim()}"
-    title="Dodaj/edytuj wyjaśnienie"
-  >
-    ?
-  </button>
+            type="button"
+            class="exp-btn"
+            @click="openExplanationPopup('question')"
+            :class="{'exp-btn-green': questionExplanation.trim(), 'exp-btn-red': !questionExplanation.trim()}"
+            title="Dodaj/edytuj wyjaśnienie"
+          >
+            ?
+          </button>
 
           <span v-if="showErrors && !currentQuestion" class="error-message">
             Pytanie jest wymagane
           </span>
         </div>
 
-<!-- Podgląd zdjęcia -->
-<div v-if="selectedImage" class="image-preview-section">
-  <span class="image-name">
-    Wybrano: {{ imageFileName }}
-  </span>
-  <div class="image-preview">
-    <img :src="selectedImage" alt="Podgląd zdjęcia" />
-    <!-- Kontener przycisków zdjęcia -->
-    <div class="image-actions">
-      <button type="button" @click="chooseImage" class="modify-image-btn" title="Zmień zdjęcie">
-        🔄
-      </button>
-      <button type="button" @click="removeImage" class="remove-btn image-remove-btn" title="Usuń zdjęcie">
-        🗑
-      </button>
-    </div>
-  </div>
-</div>
+        <!-- Podgląd zdjęcia -->
+        <div v-if="selectedImage" class="image-preview-section">
+          <span class="image-name">
+            Wybrano: {{ imageFileName }}
+          </span>
+          <div class="image-preview">
+            <img :src="selectedImage" alt="Podgląd zdjęcia" />
+            <!-- Kontener przycisków zdjęcia -->
+            <div class="image-actions">
+              <button type="button" @click="chooseImage" class="modify-image-btn" title="Zmień zdjęcie">
+                🔄
+              </button>
+              <button type="button" @click="removeImage" class="remove-btn image-remove-btn" title="Usuń zdjęcie">
+                🗑
+              </button>
+            </div>
+          </div>
+        </div>
 
         <!-- Sekcja odpowiedzi -->
         <div class="answers-section">
@@ -211,9 +211,7 @@ export default {
   data() {
     return {
       currentQuestion: "",
-      // Dodajemy również pole explanation dla pytania
       questionExplanation: "",
-      // Każda odpowiedź ma teraz dodatkowe pole explanation
       answers: [{ text: "", isCorrect: false, explanation: "" }],
       showErrors: false,
       addAnswerError: null,
@@ -224,18 +222,18 @@ export default {
       files: [],
       currentFileName: null,
       selectedImage: null,
-      // Dane związane z popupem do edycji wyjaśnień
       explanationPopup: {
         show: false,
-        type: "", // 'question' lub 'answer'
+        type: "",
         answerIndex: null,
       },
       popupExplanationText: "",
+      testName: ""
     };
   },
   computed: {
     storedTestName() {
-      return this.sanitize(this.route.query.testName || "nienazwany_test");
+      return this.sanitize(this.testName || "nienazwany_test");
     },
     imageFileName() {
       if (!this.selectedImage) return "";
@@ -258,6 +256,32 @@ export default {
     allAnswersFilled() {
       return this.answers.every((a) => a.text.trim() !== "");
     },
+  },
+  mounted() {
+    // Jeśli z query przekazano testName, ustawiamy go
+    if (this.route.query.testName) {
+      this.testName = this.route.query.testName;
+    }
+    // Jeśli z query przekazano folder, ustawiamy selectedFolder i ładujemy pliki oraz (jeśli testName nie został przekazany) odczytujemy nazwę testu z pliku testname.txt
+    if (this.route.query.folder) {
+      this.selectedFolder = decodeURIComponent(this.route.query.folder);
+      this.fetchFiles();
+      if (!this.testName) {
+        window.electronAPI.readFile({
+          folder: this.selectedFolder,
+          fileName: 'testname.txt'
+        }).then(result => {
+          if(result.success) {
+            this.testName = result.content.trim();
+          } else {
+            this.testName = "nienazwany_test";
+          }
+        }).catch(error => {
+          console.error("Błąd przy wczytywaniu nazwy testu:", error);
+          this.testName = "nienazwany_test";
+        });
+      }
+    }
   },
   methods: {
     sanitize(text) {
@@ -291,7 +315,6 @@ export default {
       try {
         const result = await window.electronAPI.listFiles(this.selectedFolder);
         if (result.success) {
-          // Filtrujemy pliki kończące się na .txt oraz wykluczamy testname.txt
           this.files = result.files.filter(
             (file) => file.endsWith(".txt") && file !== "testname.txt"
           );
@@ -329,10 +352,8 @@ export default {
           this.showNotification("Plik jest niepoprawny", "error");
           return;
         }
-        // Pierwsza linia – marker odpowiedzi (np. X101)
         const marker = lines[0].trim();
         let offset = 1;
-        // Jeśli druga linia to obraz
         if (lines[1].startsWith("[img]")) {
           const imgLine = lines[1].trim();
           const imgFileName = imgLine.substring(5, imgLine.length - 6);
@@ -341,17 +362,14 @@ export default {
         } else {
           this.selectedImage = null;
         }
-        // Wczytanie pytania
         this.currentQuestion = lines[offset].trim();
         offset++;
-        // Sprawdzamy, czy po pytaniu występuje linia z wyjaśnieniem
         if (offset < lines.length && lines[offset].startsWith("[exp]") && lines[offset].endsWith("[/exp]")) {
           this.questionExplanation = lines[offset].slice(5, -6);
           offset++;
         } else {
           this.questionExplanation = "";
         }
-        // Wczytanie odpowiedzi – marker zawiera informację, które odpowiedzi są poprawne
         const bits = marker.slice(1).split("");
         const loadedAnswers = [];
         let answerIndex = 0;
@@ -359,11 +377,7 @@ export default {
           const answerText = lines[offset].trim();
           offset++;
           let exp = "";
-          if (
-            offset < lines.length &&
-            lines[offset].startsWith("[exp]") &&
-            lines[offset].endsWith("[/exp]")
-          ) {
+          if (offset < lines.length && lines[offset].startsWith("[exp]") && lines[offset].endsWith("[/exp]")) {
             exp = lines[offset].slice(5, -6);
             offset++;
           }
@@ -404,16 +418,8 @@ export default {
         this.showNotification("Wybierz folder zapisu!", "error");
         return;
       }
-      // Marker – pierwsza litera "X" plus kolejne bity dla każdej odpowiedzi (pomiń wyjaśnienia)
       const correctMarker = "X" + this.answers.map((a) => (a.isCorrect ? "1" : "0")).join("");
-      // Jeśli nie wczytano pliku, generujemy nazwę na podstawie pytania
-      const fileName =
-        this.currentFileName ||
-        `${this.sanitize(this.currentQuestion).substring(0, 20)}.txt`;
-
-      // Przygotowanie zawartości pliku – zachowujemy strukturę:
-      // marker, (opcjonalnie [img]), pytanie, (opcjonalnie wyjaśnienie pytania),
-      // następnie dla każdej odpowiedzi: tekst odpowiedzi, (opcjonalnie wyjaśnienie)
+      const fileName = this.currentFileName || `${this.sanitize(this.currentQuestion).substring(0, 20)}.txt`;
       let contentLines = [];
       contentLines.push(correctMarker);
       if (this.selectedImage) {
@@ -458,17 +464,13 @@ export default {
             destination
           );
           if (!copyResult.success) {
-            this.showNotification(
-              "Pytanie zapisane, ale nie udało się skopiować zdjęcia",
-              "error"
-            );
+            this.showNotification("Pytanie zapisane, ale nie udało się skopiować zdjęcia", "error");
           }
         } catch (error) {
           console.error("Błąd podczas kopiowania zdjęcia:", error);
         }
       }
 
-      // Zapis nazwy testu do pliku testname.txt
       try {
         const testNameResult = await window.electronAPI.saveFile({
           folder: this.selectedFolder,
@@ -476,24 +478,19 @@ export default {
           fileContent: this.storedTestName,
         });
         if (!testNameResult.success) {
-          this.showNotification(
-            "Pytanie zapisane, ale nie udało się zapisać testname.txt",
-            "error"
-          );
+          this.showNotification("Pytanie zapisane, ale nie udało się zapisać testname.txt", "error");
         }
       } catch (error) {
         console.error("Błąd podczas zapisu testname.txt:", error);
       }
 
-      // Reset formularza i ustawienia
       this.resetForm();
       this.currentFileName = null;
       this.selectedImage = null;
     },
     addAnswer() {
       if (!this.allAnswersFilled) {
-        this.addAnswerError =
-          "Wypełnij wszystkie istniejące odpowiedzi przed dodaniem nowej";
+        this.addAnswerError = "Wypełnij wszystkie istniejące odpowiedzi przed dodaniem nowej";
         this.addAnswerPending = true;
         setTimeout(() => {
           this.addAnswerError = null;
@@ -556,7 +553,6 @@ export default {
       }
     },
     openExplanationPopup(type, answerIndex = null) {
-      // Ustawiamy aktualnie edytowany tekst – dla pytania lub danej odpowiedzi
       this.explanationPopup.type = type;
       this.explanationPopup.answerIndex = answerIndex;
       if (type === "question") {
@@ -625,7 +621,7 @@ export default {
   transform: none;
   margin: 0;
 }
-/* Przycisk do edycji wyjaśnień - ma być niewielki, tylko ikona */
+
 .exp-btn {
   background: none;
   border: none;
@@ -639,7 +635,6 @@ export default {
   transform: translateY(-50%);
 }
 
-/* Kolory przycisku - zielony gdy istnieje explanation, czerwony gdy nie */
 .exp-btn-green {
   color: #42b983;
 }
@@ -647,7 +642,6 @@ export default {
   color: #ff4444;
 }
 
-/* Kontenery dla inputów, aby umożliwić absolutne pozycjonowanie przycisku */
 .input-container {
   position: relative;
 }
@@ -658,7 +652,6 @@ export default {
   width: 100%;
 }
 
-/* Style dla przycisku akcji plików - dodano przerwę między przyciskami */
 .file-actions {
   display: flex;
   justify-content: space-between;
@@ -666,7 +659,6 @@ export default {
   gap: 0.5rem;
 }
 
-/* Popup do edycji wyjaśnień z innym tłem */
 .explanation-popup-overlay {
   position: fixed;
   top: 0;
@@ -680,7 +672,7 @@ export default {
   z-index: 10000;
 }
 .explanation-popup {
-  background: #505050; /* Zmienione tło popupu */
+  background: #505050;
   padding: 1rem 1.5rem;
   border-radius: 8px;
   width: 300px;
@@ -714,7 +706,6 @@ export default {
   color: white;
 }
 
-/* Reszta stylów – kopiowane z oryginału */
 .button-group {
   display: flex;
   flex-direction: column;
@@ -918,7 +909,6 @@ export default {
   margin-bottom: 1rem;
 }
 
-/* Rozciągnięcie inputa na całą szerokość kontenera */
 .answer-input {
   width: 100%;
   padding: 0.8rem;

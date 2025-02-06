@@ -6,10 +6,12 @@
                 Stwórz test
             </RouterLink>
 
-            <button @click="showActionDialog = true" class="btn">
+            <!-- Kliknięcie w "Wczytaj test" najpierw otwiera okno wyboru folderu -->
+            <button @click="selectFolderForTest" class="btn">
                 Wczytaj test
             </button>
 
+            <!-- Okno dialogowe akcji pojawi się dopiero po wybraniu folderu -->
             <div v-if="showActionDialog" class="action-dialog-overlay">
                 <div class="action-dialog">
                     <h3>Wybierz akcję</h3>
@@ -21,12 +23,13 @@
                             Modyfikuj test
                         </button>
                     </div>
-                    <button @click="showActionDialog = false" class="dialog-cancel-btn">
+                    <button @click="cancelAction" class="dialog-cancel-btn">
                         Anuluj
                     </button>
                 </div>
             </div>
 
+            <!-- Ukryty input służący do wyboru folderu -->
             <input type="file"
                    ref="folderInput"
                    @change="handleFolderSelection"
@@ -60,7 +63,10 @@ const router = useRouter()
 const folderInput = ref(null)
 const recentTests = ref([])
 const showActionDialog = ref(false)
-const selectedAction = ref(null)
+
+// Nowe zmienne do przechowywania wybranego folderu oraz nazwy testu
+const selectedFolder = ref(null)
+const selectedTestName = ref(null)
 
 const loadRecentTests = async () => {
     const storedTests = localStorage.getItem('recentTests')
@@ -74,7 +80,7 @@ const loadRecentTests = async () => {
                     fileName: 'testname.txt'
                 })
                 if (result.success) {
-                    return {...test, name: result.content.trim()}
+                    return { ...test, name: result.content.trim() }
                 }
             } catch (error) {
                 console.error('Błąd aktualizacji nazwy testu:', error)
@@ -96,15 +102,15 @@ const deleteTest = (index) => {
     saveRecentTests()
 }
 
-const selectAction = (action) => {
-    selectedAction.value = action
-    showActionDialog.value = false
+// Funkcja wywoływana przy kliknięciu w "Wczytaj test" – otwiera dialog wyboru folderu
+const selectFolderForTest = () => {
     folderInput.value.click()
 }
 
+// Po wybraniu folderu – zapisujemy wybraną ścieżkę oraz nazwę testu, a następnie otwieramy okno dialogowe akcji
 const handleFolderSelection = async (event) => {
     const files = event.target.files
-    if (files.length > 0 && selectedAction.value) {
+    if (files.length > 0) {
         try {
             const absolutePath = files[0].path
             const folderPath = absolutePath.substring(0, absolutePath.lastIndexOf('\\'))
@@ -117,19 +123,16 @@ const handleFolderSelection = async (event) => {
                 testName = testName.trim()
             }
 
-            if (selectedAction.value === 'quiz') {
-                updateRecentTests(testName, folderPath)
-                saveRecentTests()
-            }
+            selectedFolder.value = folderPath
+            selectedTestName.value = testName
 
-            navigateToTest(folderPath, selectedAction.value)
-
+            // Po wybraniu folderu otwieramy okno dialogowe wyboru akcji
+            showActionDialog.value = true
         } catch (error) {
             console.error('Błąd podczas przetwarzania folderu:', error)
             alert('Wystąpił błąd podczas wczytywania testu')
         } finally {
             event.target.value = null
-            selectedAction.value = null
         }
     }
 }
@@ -149,6 +152,25 @@ const updateRecentTests = (name, folder) => {
     if (recentTests.value.length > 5) {
         recentTests.value = recentTests.value.slice(0, 5)
     }
+}
+
+// Funkcja wybierająca akcję – korzysta z wcześniej wybranego folderu i nazwy testu
+const selectAction = (action) => {
+    showActionDialog.value = false
+    if (action === 'quiz') {
+        updateRecentTests(selectedTestName.value, selectedFolder.value)
+        saveRecentTests()
+    }
+    navigateToTest(selectedFolder.value, action)
+    // Czyszczenie przechowywanych danych
+    selectedFolder.value = null
+    selectedTestName.value = null
+}
+
+const cancelAction = () => {
+    showActionDialog.value = false
+    selectedFolder.value = null
+    selectedTestName.value = null
 }
 
 const navigateToTest = (folderPath, action) => {
