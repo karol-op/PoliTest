@@ -10,12 +10,14 @@
                        placeholder="Wpisz nazwę testu"
                        class="test-name-input" />
             </div>
-            <button type="submit" class="submit-btn">
-                Przejdź do tworzenia pytań
-            </button>
-            <RouterLink to="/" class="btn">
-                Wróć
-            </RouterLink>
+            <div class="button-group">
+                <button type="submit" class="submit-btn">
+                    Przejdź do tworzenia pytań
+                </button>
+                <RouterLink to="/" class="back-btn">
+                    Wróć
+                </RouterLink>
+            </div>
         </form>
     </div>
 </template>
@@ -51,9 +53,6 @@
         max-width: 600px;
         margin: 4rem auto;
         padding: 2rem;
-        /* Usunięto tło i cień, aby kontener nie rozciągał się na całą szerokość ekranu */
-        /* background-color: #1a1a1a; */
-        /* box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); */
         text-align: center;
     }
 
@@ -65,49 +64,67 @@
 
     .form-group {
         margin-bottom: 1.5rem;
-        text-align: left;
-    }
-
-    label {
-        display: block;
-        margin-bottom: 0.5rem;
-        color: #1a1a1a;
-        font-weight: 500;
     }
 
     .test-name-input {
         width: 100%;
-        padding: 0.8rem;
-        border: 2px solid #ccc;
+        padding: 1rem;
+        border: 2px solid #42b983;
         border-radius: 8px;
         font-size: 1rem;
-        background-color: #fff;
-        color: #333;
+        background-color: #2d2d2d;
+        color: white;
         outline: none;
-        transition: border-color 0.3s ease;
+        transition: all 0.3s ease;
     }
 
-        .test-name-input:focus {
-            border-color: #42b983;
-        }
+    .test-name-input:focus {
+        border-color: #36a174;
+        box-shadow: 0 0 8px rgba(66, 185, 131, 0.3);
+    }
 
-        .test-name-input::placeholder {
-            color: #888;
-        }
+    .test-name-input::placeholder {
+        color: #888;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-top: 2rem;
+    }
 
     .submit-btn {
         background: linear-gradient(135deg, #42b983, #36a174);
-        color: #ffffff;
+        color: white;
         padding: 1rem 2rem;
         border: none;
         border-radius: 8px;
         cursor: pointer;
         font-size: 1rem;
-        transition: background 0.3s ease, transform 0.2s ease;
+        transition: all 0.3s ease;
     }
 
-        .submit-btn:hover {
-            background: linear-gradient(135deg, #36a174, #42b983);
-            transform: translateY(-2px);
-        }
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(66, 185, 131, 0.3);
+    }
+
+    .back-btn {
+        background: linear-gradient(135deg, #666, #444);
+        color: white;
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .back-btn:hover {
+        background: linear-gradient(135deg, #777, #555);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 102, 102, 0.3);
+    }
 </style>

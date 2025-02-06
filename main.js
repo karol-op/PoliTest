@@ -54,8 +54,17 @@ app.whenReady().then(() => {
       return { success: false, message: 'Błąd odczytu pliku' };
     }
   });
-
-  // Nowa obsługa wyboru obrazu
+  ipcMain.handle('delete-file', async (_, { folder, fileName }) => {
+    const filePath = path.join(folder, fileName);
+    try {
+      await fs.unlink(filePath);
+      return { success: true };
+    } catch (error) {
+      console.error('Błąd usuwania pliku:', error);
+      return { success: false };
+    }
+  });
+  //obsługa wyboru obrazu
   ipcMain.handle('select-image', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
@@ -69,7 +78,7 @@ app.whenReady().then(() => {
     return result.filePaths[0];
   });
 
-  // Nowa obsługa kopiowania pliku
+  //obsługa kopiowania pliku
   ipcMain.handle('copy-file', async (event, { source, destination }) => {
     try {
       await fs.copyFile(source, destination);
@@ -83,7 +92,7 @@ app.whenReady().then(() => {
   if (isDev) {
     mainWindow.webContents.toggleDevTools();
 
-    mainWindow.loadURL('http://localhost:5173'); // Vite domyślnie używa portu 5173
+    mainWindow.loadURL('http://localhost:5173'); 
   } else {
     mainWindow.webContents.toggleDevTools();
 

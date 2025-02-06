@@ -6,9 +6,27 @@
                 Stwórz test
             </RouterLink>
 
-            <button @click="openFolderDialog" class="btn">
-                Otwórz test
+            <button @click="showActionDialog = true" class="btn">
+                Wczytaj test
             </button>
+
+            <!-- Action selection dialog -->
+            <div v-if="showActionDialog" class="action-dialog-overlay">
+                <div class="action-dialog">
+                    <h3>Wybierz akcję</h3>
+                    <div class="dialog-buttons">
+                        <button @click="selectAction('quiz')" class="dialog-btn quiz-btn">
+                            Rozpocznij quiz
+                        </button>
+                        <button @click="selectAction('modify')" class="dialog-btn modify-btn">
+                            Modyfikuj test
+                        </button>
+                    </div>
+                    <button @click="showActionDialog = false" class="dialog-cancel-btn">
+                        Anuluj
+                    </button>
+                </div>
+            </div>
 
             <input type="file"
                    ref="folderInput"
@@ -19,7 +37,7 @@
         </nav>
 
         <div class="recent-tests">
-            <h2>Ostatnio otwierane testy</h2>
+            <h2>Ostatnio uruchamiane quizy</h2>
             <ul class="tests-list">
                 <li v-for="(test, index) in recentTests"
                     :key="index"
@@ -39,6 +57,8 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const folderInput = ref(null)
 const recentTests = ref([])
+const showActionDialog = ref(false)
+const selectedAction = ref(null)
 
 onMounted(() => {
     loadRecentTests()
@@ -60,38 +80,52 @@ const readFileContent = (file) => {
     })
 }
 
-const openFolderDialog = () => {
+
+
+const selectAction = (action) => {
+    selectedAction.value = action
+    showActionDialog.value = false
     folderInput.value.click()
 }
 
 const handleFolderSelection = async (event) => {
     const files = event.target.files
-    if (files.length > 0) {
+    if (files.length > 0 && selectedAction.value) {
         try {
-            // Pobierz pierwszą ścieżkę absolutną
             const absolutePath = files[0].path
-            const folderPath = absolutePath.substring(0, absolutePath.lastIndexOf('\\')) // Dla Windowsa
+            const folderPath = absolutePath.substring(0, absolutePath.lastIndexOf('\\'))
 
-            let testName = folderPath.split('\\').pop() // Domyślnie nazwa folderu
+            let testName = folderPath.split('\\').pop()
 
-            // Szukaj pliku z nazwą testu
             const nameFile = Array.from(files).find(f => f.name === 'testname.txt')
             if (nameFile) {
                 testName = await readFileContent(nameFile)
                 testName = testName.trim()
             }
 
-            updateRecentTests(testName, folderPath)
-            saveRecentTests()
-            navigateToTest(folderPath)
+            if (selectedAction.value === 'quiz') {
+                updateRecentTests(testName, folderPath)
+                saveRecentTests()
+            }
+
+            navigateToTest(folderPath, selectedAction.value)
 
         } catch (error) {
             console.error('Błąd podczas przetwarzania folderu:', error)
             alert('Wystąpił błąd podczas wczytywania testu')
         } finally {
             event.target.value = null
+            selectedAction.value = null
         }
     }
+}
+
+const navigateToTest = (folderPath, action) => {
+    const routeName = action === 'quiz' ? 'testquiz' : 'createquestions'
+    router.push({
+        name: routeName,
+        query: { folder: encodeURIComponent(folderPath) }
+    })
 }
 
 const updateRecentTests = (name, folder) => {
@@ -107,12 +141,7 @@ const saveRecentTests = () => {
     localStorage.setItem('recentTests', JSON.stringify(recentTests.value))
 }
 
-const navigateToTest = (folderPath) => {
-    router.push({
-        name: 'testquiz',
-        query: { folder: encodeURIComponent(folderPath) }
-    })
-}
+
 
 const openTest = (folderPath) => {
     router.push({
@@ -124,6 +153,73 @@ const openTest = (folderPath) => {
 
 
 <style scoped>
+.action-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.action-dialog {
+    background: #2d2d2d;
+    padding: 2rem;
+    border-radius: 12px;
+    text-align: center;
+    width: 400px;
+}
+
+.action-dialog h3 {
+    color: white;
+    margin-bottom: 1.5rem;
+}
+
+.dialog-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.dialog-btn {
+    padding: 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.dialog-btn:hover {
+    transform: translateY(-2px);
+}
+
+.quiz-btn {
+    background: linear-gradient(135deg, #42b983, #36a174);
+    color: white;
+}
+
+.modify-btn {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: white;
+}
+
+.dialog-cancel-btn {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+}
+
+.dialog-cancel-btn:hover {
+    color: #aaa;
+}
 #app {
     max-width: 800px;
     margin: 2rem auto;

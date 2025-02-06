@@ -11,10 +11,15 @@
         </li>
       </ul>
       <p v-else class="no-files">Brak plików w folderze</p>
-      <!-- Przycisk "Nowy plik" umieszczony na dole sekcji listy plików -->
-      <button v-if="currentFileName" @click="resetCurrentFile" class="new-file-btn">
-        Nowy plik
-      </button>
+      <!-- Przyciski "Nowy plik" oraz "Usuń plik" - umieszczone na dole sekcji plików -->
+      <div class="file-actions">
+        <button v-if="currentFileName" @click="resetCurrentFile" class="new-file-btn">
+          Nowy plik
+        </button>
+        <button v-if="currentFileName" @click="deleteCurrentFile" class="delete-file-btn">
+          Usuń plik
+        </button>
+      </div>
     </div>
 
     <!-- Główny formularz -->
@@ -33,25 +38,26 @@
           <p v-if="folderError" class="error-message">{{ folderError }}</p>
         </div>
         <div v-else class="selected-folder-container">
-          <div class="selected-folder-display">
-            <p class="selected-folder">
-              📁 Wybrana lokalizacja: <strong>{{ selectedFolder }}</strong>
-            </p>
-            <button @click="changeFolder" class="reload-button" title="Zmień folder">
-              🔄
-            </button>
-          </div>
-          <div class="image-upload">
-            <button type="button" @click="chooseImage" class="image-btn">
-              {{ selectedImage ? 'Zmodyfikuj zdjęcie' : 'Dodaj zdjęcie' }}
-            </button>
-          </div>
-        </div>
+    <div class="selected-folder-display">
+      <p class="selected-folder">
+        📁 Wybrana lokalizacja: <strong>{{ selectedFolder }}</strong>
+      </p>
+      <button @click="changeFolder" class="reload-button" title="Zmień folder">
+        🔄
+      </button>
+    </div>
+    <div class="image-upload" v-if="!selectedImage">
+      <button type="button" @click="chooseImage" class="image-btn">
+        Dodaj zdjęcie
+      </button>
+    </div>
+  </div>
       </div>
 
       <!-- Formularz pytania -->
       <form @submit.prevent="handleSubmit">
-        <div class="form-group">
+        <!-- Kontener dla pola pytania (relative, by umieścić przycisk wewnątrz) -->
+        <div class="form-group question-group input-container">
           <textarea
             v-model.trim="currentQuestion"
             placeholder="Wpisz swoje pytanie"
@@ -60,24 +66,39 @@
             class="question-input"
             :class="{ 'input-error': showErrors && !currentQuestion }"
           ></textarea>
+          <button
+    type="button"
+    class="exp-btn"
+    @click="openExplanationPopup('question')"
+    :class="{'exp-btn-green': questionExplanation.trim(), 'exp-btn-red': !questionExplanation.trim()}"
+    title="Dodaj/edytuj wyjaśnienie"
+  >
+    ?
+  </button>
+
           <span v-if="showErrors && !currentQuestion" class="error-message">
             Pytanie jest wymagane
           </span>
         </div>
 
-        <!-- Podgląd zdjęcia -->
-        <div v-if="selectedImage" class="image-preview-section">
-          <span class="image-name">
-            Wybrano: {{ imageFileName }}
-          </span>
-          <div class="image-preview">
-            <img :src="selectedImage" alt="Podgląd zdjęcia" />
-            <!-- Czerwony przycisk z ikoną kosza do usunięcia zdjęcia -->
-            <button type="button" @click="removeImage" class="remove-btn image-remove-btn" title="Usuń zdjęcie">
-              🗑
-            </button>
-          </div>
-        </div>
+<!-- Podgląd zdjęcia -->
+<div v-if="selectedImage" class="image-preview-section">
+  <span class="image-name">
+    Wybrano: {{ imageFileName }}
+  </span>
+  <div class="image-preview">
+    <img :src="selectedImage" alt="Podgląd zdjęcia" />
+    <!-- Kontener przycisków zdjęcia -->
+    <div class="image-actions">
+      <button type="button" @click="chooseImage" class="modify-image-btn" title="Zmień zdjęcie">
+        🔄
+      </button>
+      <button type="button" @click="removeImage" class="remove-btn image-remove-btn" title="Usuń zdjęcie">
+        🗑
+      </button>
+    </div>
+  </div>
+</div>
 
         <!-- Sekcja odpowiedzi -->
         <div class="answers-section">
@@ -87,14 +108,26 @@
             :key="index"
             class="answer-item"
           >
-            <input
-              type="text"
-              v-model.trim="answer.text"
-              placeholder="Wpisz odpowiedź"
-              class="answer-input"
-              :class="{ 'input-error': showErrors && !answer.text }"
-              @input="clearAddError"
-            />
+            <!-- Kontener inputa z przyciskiem explanation -->
+            <div class="answer-input-container">
+              <input
+                type="text"
+                v-model.trim="answer.text"
+                placeholder="Wpisz odpowiedź"
+                class="answer-input"
+                :class="{ 'input-error': showErrors && !answer.text }"
+                @input="clearAddError"
+              />
+              <button
+                type="button"
+                class="exp-btn"
+                @click="openExplanationPopup('answer', index)"
+                :class="{'exp-btn-green': answer.explanation.trim(), 'exp-btn-red': !answer.explanation.trim()}"
+                title="Dodaj/edytuj wyjaśnienie"
+              >
+                ?
+              </button>
+            </div>
             <label class="correct-label">
               <input
                 type="checkbox"
@@ -103,6 +136,7 @@
               />
               Poprawna
             </label>
+            <!-- Przycisk usuwania odpowiedzi -->
             <button
               v-if="answers.length > 1"
               @click="confirmRemove(index)"
@@ -145,6 +179,18 @@
       </form>
     </div>
 
+    <!-- Popup do edycji wyjaśnień -->
+    <div v-if="explanationPopup.show" class="explanation-popup-overlay">
+      <div class="explanation-popup">
+        <h3>Wyjaśnienie: {{ explanationPopup.type === 'question' ? 'Pytania' : 'Odpowiedzi' }}</h3>
+        <textarea v-model="popupExplanationText" placeholder="Wpisz wyjaśnienie"></textarea>
+        <div class="popup-actions">
+          <button @click="saveExplanation" class="popup-save-btn">Zapisz</button>
+          <button @click="closeExplanationPopup" class="popup-cancel-btn">Anuluj</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Powiadomienia -->
     <transition name="fade">
       <div v-if="notification" :class="['notification', notification.type]">
@@ -159,14 +205,16 @@ import { useRoute } from "vue-router";
 
 export default {
   setup() {
-    // Pobranie bieżącej trasy (route)
     const route = useRoute();
     return { route };
   },
   data() {
     return {
       currentQuestion: "",
-      answers: [{ text: "", isCorrect: false }],
+      // Dodajemy również pole explanation dla pytania
+      questionExplanation: "",
+      // Każda odpowiedź ma teraz dodatkowe pole explanation
+      answers: [{ text: "", isCorrect: false, explanation: "" }],
       showErrors: false,
       addAnswerError: null,
       addAnswerPending: false,
@@ -176,28 +224,30 @@ export default {
       files: [],
       currentFileName: null,
       selectedImage: null,
+      // Dane związane z popupem do edycji wyjaśnień
+      explanationPopup: {
+        show: false,
+        type: "", // 'question' lub 'answer'
+        answerIndex: null,
+      },
+      popupExplanationText: "",
     };
   },
   computed: {
-    // Zwraca nazwę testu po usunięciu znaków specjalnych
     storedTestName() {
       return this.sanitize(this.route.query.testName || "nienazwany_test");
     },
-    // Wyciąga nazwę pliku obrazu z pełnej ścieżki
     imageFileName() {
       if (!this.selectedImage) return "";
       const parts = this.selectedImage.split(/[\\/]/);
       return parts[parts.length - 1];
     },
-    // Sprawdza, czy przynajmniej jedna odpowiedź ma tekst
     hasValidAnswers() {
       return this.answers.some((a) => a.text.trim() !== "");
     },
-    // Sprawdza, czy przynajmniej jedna odpowiedź jest oznaczona jako poprawna
     hasCorrectAnswer() {
       return this.answers.some((a) => a.isCorrect);
     },
-    // Sprawdza, czy formularz jest poprawnie wypełniony
     isFormValid() {
       return (
         this.currentQuestion.trim() !== "" &&
@@ -205,13 +255,11 @@ export default {
         this.hasCorrectAnswer
       );
     },
-    // Sprawdza, czy wszystkie odpowiedzi są wypełnione
     allAnswersFilled() {
       return this.answers.every((a) => a.text.trim() !== "");
     },
   },
   methods: {
-    // Usuwa znaki specjalne z tekstu, używane przy generowaniu nazw plików
     sanitize(text) {
       return text
         .normalize("NFD")
@@ -221,18 +269,16 @@ export default {
         .replace(/[^a-z0-9_]/g, "")
         .substring(0, 50);
     },
-    // Nawigacja do poprzedniej strony
     goBack() {
-      this.$router.go(-1); // Cofnięcie o jedną stronę w historii
+      this.$router.go(-1);
     },
-    // Wybór folderu do zapisu
     async selectFolder() {
       try {
         const folderPath = await window.electronAPI.selectFolder();
         if (folderPath) {
           this.selectedFolder = folderPath;
           this.folderError = "";
-          await this.fetchFiles(); // Po wyborze folderu wczytuje listę plików
+          await this.fetchFiles();
         } else {
           this.folderError = "Nie wybrano folderu";
         }
@@ -240,13 +286,15 @@ export default {
         this.folderError = "Nie udało się wybrać folderu.";
       }
     },
-    // Pobiera listę plików (tylko .txt) z wybranego folderu
     async fetchFiles() {
       if (!this.selectedFolder) return;
       try {
         const result = await window.electronAPI.listFiles(this.selectedFolder);
         if (result.success) {
-          this.files = result.files.filter((file) => file.endsWith(".txt"));
+          // Filtrujemy pliki kończące się na .txt oraz wykluczamy testname.txt
+          this.files = result.files.filter(
+            (file) => file.endsWith(".txt") && file !== "testname.txt"
+          );
         } else {
           this.showNotification("Nie udało się wczytać plików", "error");
         }
@@ -255,14 +303,12 @@ export default {
         this.showNotification("Błąd pobierania plików", "error");
       }
     },
-    // Zmiana folderu – resetuje wybrane dane i formularz
     changeFolder() {
       this.selectedFolder = null;
       this.files = [];
       this.currentFileName = null;
       this.resetForm();
     },
-    // Wczytuje zawartość pliku i ustawia dane formularza
     async loadFile(fileName) {
       if (!this.selectedFolder) {
         this.showNotification("Wybierz folder zapisu!", "error");
@@ -283,27 +329,52 @@ export default {
           this.showNotification("Plik jest niepoprawny", "error");
           return;
         }
-        // Pobranie markera z pierwszej linii
+        // Pierwsza linia – marker odpowiedzi (np. X101)
         const marker = lines[0].trim();
-        // Jeśli druga linia zawiera znacznik obrazu, wyodrębniamy nazwę obrazu
         let offset = 1;
+        // Jeśli druga linia to obraz
         if (lines[1].startsWith("[img]")) {
           const imgLine = lines[1].trim();
-          const imgFileName = imgLine.substring(5, imgLine.length - 6); // Usuwamy [img] oraz [/img]
-          // Ustawiamy obraz – zakładamy, że obraz znajduje się w wybranym folderze
+          const imgFileName = imgLine.substring(5, imgLine.length - 6);
           this.selectedImage = this.selectedFolder + "/" + imgFileName;
           offset = 2;
         } else {
           this.selectedImage = null;
         }
-        // Ustawienie pytania oraz listy odpowiedzi
+        // Wczytanie pytania
         this.currentQuestion = lines[offset].trim();
-        const answersText = lines.slice(offset + 1);
+        offset++;
+        // Sprawdzamy, czy po pytaniu występuje linia z wyjaśnieniem
+        if (offset < lines.length && lines[offset].startsWith("[exp]") && lines[offset].endsWith("[/exp]")) {
+          this.questionExplanation = lines[offset].slice(5, -6);
+          offset++;
+        } else {
+          this.questionExplanation = "";
+        }
+        // Wczytanie odpowiedzi – marker zawiera informację, które odpowiedzi są poprawne
         const bits = marker.slice(1).split("");
-        this.answers = answersText.map((text, index) => ({
-          text: text.trim(),
-          isCorrect: bits[index] === "1",
-        }));
+        const loadedAnswers = [];
+        let answerIndex = 0;
+        while (offset < lines.length) {
+          const answerText = lines[offset].trim();
+          offset++;
+          let exp = "";
+          if (
+            offset < lines.length &&
+            lines[offset].startsWith("[exp]") &&
+            lines[offset].endsWith("[/exp]")
+          ) {
+            exp = lines[offset].slice(5, -6);
+            offset++;
+          }
+          loadedAnswers.push({
+            text: answerText,
+            isCorrect: bits[answerIndex] === "1",
+            explanation: exp,
+          });
+          answerIndex++;
+        }
+        this.answers = loadedAnswers;
         this.currentFileName = fileName;
         this.showNotification("Plik wczytany poprawnie", "success");
       } catch (error) {
@@ -311,7 +382,6 @@ export default {
         this.showNotification("Błąd przy wczytywaniu pliku", "error");
       }
     },
-    // Wybór zdjęcia (ścieżka do pliku obrazu)
     async chooseImage() {
       try {
         const imagePath = await window.electronAPI.selectImage();
@@ -324,43 +394,43 @@ export default {
         this.showNotification("Błąd przy wybieraniu zdjęcia", "error");
       }
     },
-    // Usuwa zdjęcie z pytania
     removeImage() {
       this.selectedImage = null;
       this.showNotification("Zdjęcie usunięte", "success");
     },
-    // Zapisuje pytanie do pliku oraz wykonuje kopiowanie zdjęcia i zapis nazwy testu
     async handleSubmit() {
       if (!this.validateForm()) return;
       if (!this.selectedFolder) {
         this.showNotification("Wybierz folder zapisu!", "error");
         return;
       }
-      // Obliczenie markera poprawności odpowiedzi
+      // Marker – pierwsza litera "X" plus kolejne bity dla każdej odpowiedzi (pomiń wyjaśnienia)
       const correctMarker = "X" + this.answers.map((a) => (a.isCorrect ? "1" : "0")).join("");
       // Jeśli nie wczytano pliku, generujemy nazwę na podstawie pytania
       const fileName =
         this.currentFileName ||
         `${this.sanitize(this.currentQuestion).substring(0, 20)}.txt`;
 
-      // Przygotowanie zawartości pliku
-      let fileContent = "";
+      // Przygotowanie zawartości pliku – zachowujemy strukturę:
+      // marker, (opcjonalnie [img]), pytanie, (opcjonalnie wyjaśnienie pytania),
+      // następnie dla każdej odpowiedzi: tekst odpowiedzi, (opcjonalnie wyjaśnienie)
+      let contentLines = [];
+      contentLines.push(correctMarker);
       if (this.selectedImage) {
-        fileContent = [
-          correctMarker,
-          "[img]" + this.imageFileName + "[/img]",
-          this.currentQuestion,
-          ...this.answers.map((a) => a.text.trim()),
-        ].join("\n");
-      } else {
-        fileContent = [
-          correctMarker,
-          this.currentQuestion,
-          ...this.answers.map((a) => a.text.trim()),
-        ].join("\n");
+        contentLines.push("[img]" + this.imageFileName + "[/img]");
       }
+      contentLines.push(this.currentQuestion);
+      if (this.questionExplanation.trim() !== "") {
+        contentLines.push("[exp]" + this.questionExplanation.trim() + "[/exp]");
+      }
+      this.answers.forEach((a) => {
+        contentLines.push(a.text.trim());
+        if (a.explanation.trim() !== "") {
+          contentLines.push("[exp]" + a.explanation.trim() + "[/exp]");
+        }
+      });
+      const fileContent = contentLines.join("\n");
 
-      // Zapis pliku z pytaniem
       try {
         const result = await window.electronAPI.saveFile({
           folder: this.selectedFolder,
@@ -380,7 +450,6 @@ export default {
         return;
       }
 
-      // Jeśli wybrano zdjęcie, kopiujemy je do folderu docelowego
       if (this.selectedImage) {
         try {
           const destination = this.selectedFolder + "/" + this.imageFileName;
@@ -416,12 +485,11 @@ export default {
         console.error("Błąd podczas zapisu testname.txt:", error);
       }
 
-      // Reset formularza i usunięcie wybranych plików/zdjęcia
+      // Reset formularza i ustawienia
       this.resetForm();
       this.currentFileName = null;
       this.selectedImage = null;
     },
-    // Dodaje nową pustą odpowiedź
     addAnswer() {
       if (!this.allAnswersFilled) {
         this.addAnswerError =
@@ -433,45 +501,85 @@ export default {
         }, 3000);
         return;
       }
-      this.answers.push({ text: "", isCorrect: false });
+      this.answers.push({ text: "", isCorrect: false, explanation: "" });
       this.addAnswerError = null;
       this.addAnswerPending = false;
     },
-    // Pyta o potwierdzenie usunięcia odpowiedzi, a następnie usuwa
     confirmRemove(index) {
       if (confirm("Czy na pewno chcesz usunąć tę odpowiedź?")) {
         this.removeAnswer(index);
       }
     },
-    // Usuwa odpowiedź o podanym indeksie (o ile pozostała przynajmniej jedna)
     removeAnswer(index) {
       if (this.answers.length > 1) {
         this.answers.splice(index, 1);
       }
     },
-    // Czyści błąd przy dodawaniu odpowiedzi
     clearAddError() {
       this.addAnswerError = null;
       this.addAnswerPending = false;
     },
-    // Walidacja formularza – ustawia flagę wyświetlania błędów
     validateForm() {
       this.showErrors = true;
       return this.isFormValid;
     },
-    // Resetuje dane formularza (pytanie oraz odpowiedzi)
     resetForm() {
       this.currentQuestion = "";
-      this.answers = [{ text: "", isCorrect: false }];
+      this.questionExplanation = "";
+      this.answers = [{ text: "", isCorrect: false, explanation: "" }];
       this.showErrors = false;
     },
-    // Resetuje bieżący plik i formularz oraz usuwa wybrane zdjęcie
     resetCurrentFile() {
       this.resetForm();
       this.currentFileName = null;
       this.selectedImage = null;
     },
-    // Wyświetla powiadomienie na określony czas
+    async deleteCurrentFile() {
+      if (!this.currentFileName) return;
+      if (confirm(`Czy na pewno chcesz usunąć plik "${this.currentFileName}"?`)) {
+        try {
+          const result = await window.electronAPI.deleteFile({
+            folder: this.selectedFolder,
+            fileName: this.currentFileName,
+          });
+          if (result.success) {
+            this.showNotification("Plik usunięty", "success");
+            await this.fetchFiles();
+            this.resetCurrentFile();
+          } else {
+            this.showNotification("Nie udało się usunąć pliku", "error");
+          }
+        } catch (error) {
+          console.error("Błąd podczas usuwania pliku:", error);
+          this.showNotification("Błąd podczas usuwania pliku", "error");
+        }
+      }
+    },
+    openExplanationPopup(type, answerIndex = null) {
+      // Ustawiamy aktualnie edytowany tekst – dla pytania lub danej odpowiedzi
+      this.explanationPopup.type = type;
+      this.explanationPopup.answerIndex = answerIndex;
+      if (type === "question") {
+        this.popupExplanationText = this.questionExplanation;
+      } else if (type === "answer" && answerIndex !== null) {
+        this.popupExplanationText = this.answers[answerIndex].explanation;
+      }
+      this.explanationPopup.show = true;
+    },
+    saveExplanation() {
+      if (this.explanationPopup.type === "question") {
+        this.questionExplanation = this.popupExplanationText;
+      } else if (this.explanationPopup.type === "answer" && this.explanationPopup.answerIndex !== null) {
+        this.answers[this.explanationPopup.answerIndex].explanation = this.popupExplanationText;
+      }
+      this.closeExplanationPopup();
+    },
+    closeExplanationPopup() {
+      this.explanationPopup.show = false;
+      this.popupExplanationText = "";
+      this.explanationPopup.type = "";
+      this.explanationPopup.answerIndex = null;
+    },
     showNotification(message, type) {
       this.notification = { message, type };
       setTimeout(() => {
@@ -483,8 +591,130 @@ export default {
 </script>
 
 <style scoped>
-/* Stylowanie komponentu – niezmienione względem oryginału */
+.image-actions {
+  position: absolute;
+  top: 5px;
+  right: -1px;
+  display: flex;
+  gap: 5px;
+  margin-top: 2.5rem;
+}
 
+.modify-image-btn {
+  background: #42b983;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  padding: 5px;
+  margin-right: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 100px;
+}
+
+.modify-image-btn:hover {
+  background: #36a174;
+}
+
+.image-remove-btn {
+  position: static;
+  transform: none;
+  margin: 0;
+}
+/* Przycisk do edycji wyjaśnień - ma być niewielki, tylko ikona */
+.exp-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  line-height: 1;
+  position: absolute;
+  right: -18px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Kolory przycisku - zielony gdy istnieje explanation, czerwony gdy nie */
+.exp-btn-green {
+  color: #42b983;
+}
+.exp-btn-red {
+  color: #ff4444;
+}
+
+/* Kontenery dla inputów, aby umożliwić absolutne pozycjonowanie przycisku */
+.input-container {
+  position: relative;
+}
+
+.answer-input-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+/* Style dla przycisku akcji plików - dodano przerwę między przyciskami */
+.file-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  gap: 0.5rem;
+}
+
+/* Popup do edycji wyjaśnień z innym tłem */
+.explanation-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+.explanation-popup {
+  background: #505050; /* Zmienione tło popupu */
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+}
+.explanation-popup textarea {
+  width: 100%;
+  height: 80px;
+  margin: 0.5rem 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+.popup-actions {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 0.5rem;
+}
+.popup-save-btn,
+.popup-cancel-btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.popup-save-btn {
+  background: #42b983;
+  color: white;
+}
+.popup-cancel-btn {
+  background: #ff4444;
+  color: white;
+}
+
+/* Reszta stylów – kopiowane z oryginału */
 .button-group {
   display: flex;
   flex-direction: column;
@@ -499,8 +729,7 @@ export default {
 }
 
 .back-btn {
-  width: 79%;
-  margin-left: 3.2rem;
+  width: 100%;
   padding: 0.8rem 1.5rem;
   background: linear-gradient(135deg, #666, #444);
   color: white;
@@ -519,7 +748,6 @@ export default {
   display: flex;
   gap: 3rem;
   padding: 2rem;
-  align-items: flex-start;
   padding-right: 150px;
 }
 
@@ -528,17 +756,17 @@ export default {
   align-items: center;
   gap: 1rem;
   width: 100%;
+  margin-bottom: 20px;
 }
 
 .selected-folder-display {
+  flex-grow: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
   background: #404040;
-  border: 1px solid #404040;
-  border-radius: 6px;
   padding: 8px 12px;
-  flex-grow: 1;
+  border-radius: 6px;
 }
 
 .selected-folder {
@@ -565,8 +793,7 @@ export default {
 }
 
 .image-upload {
-  display: flex;
-  align-items: center;
+  flex-shrink: 0;
 }
 
 .image-btn {
@@ -632,6 +859,7 @@ export default {
   cursor: pointer;
   margin-top: auto;
   transition: transform 0.2s;
+  height: 70px;
 }
 
 .new-file-btn:hover {
@@ -654,7 +882,6 @@ export default {
   font-size: 1.1rem;
   resize: none;
   text-align: center;
-  margin: 1rem 0;
 }
 
 .image-preview-section {
@@ -666,7 +893,6 @@ export default {
   position: relative;
 }
 
-/* Ograniczenie maksymalnych rozmiarów podglądu zdjęcia */
 .image-preview img {
   max-width: 250px;
   max-height: 250px;
@@ -675,7 +901,6 @@ export default {
   border-radius: 4px;
 }
 
-/* Przycisk usuwania zdjęcia – wycentrowany wertykalnie w swoim kontenerze */
 .image-remove-btn {
   position: absolute;
   top: 50%;
@@ -688,19 +913,17 @@ export default {
 }
 
 .answer-item {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 1rem;
+  display: flex;
   align-items: center;
   margin-bottom: 1rem;
 }
 
+/* Rozciągnięcie inputa na całą szerokość kontenera */
 .answer-input {
-  width: 170%;
+  width: 100%;
   padding: 0.8rem;
   border: 2px solid #ddd;
   border-radius: 6px;
-  resize: none;
   text-align: center;
 }
 
@@ -709,7 +932,7 @@ export default {
   align-items: center;
   gap: 0.5rem;
   white-space: nowrap;
-  margin-left: 11rem;
+  margin-left: 3rem;
 }
 
 .input-error {
@@ -757,6 +980,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: 1.5rem;
 }
 
 .notification {
