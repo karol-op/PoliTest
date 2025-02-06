@@ -6,8 +6,6 @@
       <header class="quiz-header">
         <button @click="goToMainMenu" class="main-menu-btn">
           🏠︎
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M3 12l9-9 9 9v9a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-6H9v6a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-9z"/>
         </button>
         <h1 class="test-name">{{ testName }}</h1>
       </header>
@@ -92,7 +90,7 @@
     <!-- Panel statystyk -->
     <div class="stats-panel">
       <h2>Statystyki</h2>
-      <p>Odpowiedzi udzielone: {{ answeredCount }} / {{ questions.length }}</p>
+      <p>Udzielone odpowiedzi</p>
       <div class="progress-container">
         <span class="correct-count">{{ score }}</span>
         <div class="progress-bar">
@@ -153,6 +151,29 @@ export default {
     const progressPercentage = computed(() => {
       return answeredCount.value > 0 ? (score.value / answeredCount.value) * 100 : 0;
     });
+
+    const checkForNameUpdate = async () => {
+      try {
+        const result = await window.electronAPI.readFile({
+          folder,
+          fileName: "testname.txt"
+        });
+        if (result.success) {
+          const newName = result.content.trim();
+          if (newName !== testName.value) {
+            testName.value = newName;
+            // Aktualizuj localStorage na stronie głównej
+            const recentTests = JSON.parse(localStorage.getItem('recentTests') || '[]');
+            const updatedTests = recentTests.map(t => 
+              t.folder === folder ? {...t, name: newName} : t
+            );
+            localStorage.setItem('recentTests', JSON.stringify(updatedTests));
+          }
+        }
+      } catch (error) {
+        console.error('Błąd sprawdzania aktualizacji nazwy:', error);
+      }
+    };
 
     const loadQuestions = async () => {
       if (!folder) {
@@ -298,6 +319,8 @@ export default {
 
     onMounted(() => {
       loadQuestions();
+      const interval = setInterval(checkForNameUpdate, 5000);
+      return () => clearInterval(interval);
     });
 
     return {
@@ -332,6 +355,7 @@ export default {
   }
 };
 </script>
+
 
 <style scoped>
 .quiz-wrapper {

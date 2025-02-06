@@ -10,7 +10,6 @@
                 Wczytaj test
             </button>
 
-            <!-- Action selection dialog -->
             <div v-if="showActionDialog" class="action-dialog-overlay">
                 <div class="action-dialog">
                     <h3>Wybierz akcję</h3>
@@ -44,6 +43,9 @@
                     class="test-item"
                     @click="openTest(test.folder)">
                     {{ test.name }}
+                    <button @click.stop="deleteTest(index)" class="delete-btn" title="Usuń z listy">
+                        🗑️
+                    </button>
                 </li>
             </ul>
         </div>
@@ -60,27 +62,39 @@ const recentTests = ref([])
 const showActionDialog = ref(false)
 const selectedAction = ref(null)
 
-onMounted(() => {
-    loadRecentTests()
-})
-
-const loadRecentTests = () => {
+const loadRecentTests = async () => {
     const storedTests = localStorage.getItem('recentTests')
     if (storedTests) {
-        recentTests.value = JSON.parse(storedTests)
+        const parsedTests = JSON.parse(storedTests)
+        
+        const updatedTests = await Promise.all(parsedTests.map(async test => {
+            try {
+                const result = await window.electronAPI.readFile({
+                    folder: test.folder,
+                    fileName: 'testname.txt'
+                })
+                if (result.success) {
+                    return {...test, name: result.content.trim()}
+                }
+            } catch (error) {
+                console.error('Błąd aktualizacji nazwy testu:', error)
+            }
+            return test
+        }))
+
+        recentTests.value = updatedTests
+        saveRecentTests()
     }
 }
 
-const readFileContent = (file) => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result)
-        reader.onerror = reject
-        reader.readAsText(file)
-    })
+const saveRecentTests = () => {
+    localStorage.setItem('recentTests', JSON.stringify(recentTests.value))
 }
 
-
+const deleteTest = (index) => {
+    recentTests.value.splice(index, 1)
+    saveRecentTests()
+}
 
 const selectAction = (action) => {
     selectedAction.value = action
@@ -120,6 +134,23 @@ const handleFolderSelection = async (event) => {
     }
 }
 
+const readFileContent = (file) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = reject
+        reader.readAsText(file)
+    })
+}
+
+const updateRecentTests = (name, folder) => {
+    recentTests.value = recentTests.value.filter(t => t.folder !== folder)
+    recentTests.value.unshift({ name, folder })
+    if (recentTests.value.length > 5) {
+        recentTests.value = recentTests.value.slice(0, 5)
+    }
+}
+
 const navigateToTest = (folderPath, action) => {
     const routeName = action === 'quiz' ? 'testquiz' : 'createquestions'
     router.push({
@@ -128,29 +159,17 @@ const navigateToTest = (folderPath, action) => {
     })
 }
 
-const updateRecentTests = (name, folder) => {
-    recentTests.value = recentTests.value.filter(t => t.folder !== folder)
-    recentTests.value.unshift({ name, folder })
-
-    if (recentTests.value.length > 5) {
-        recentTests.value = recentTests.value.slice(0, 5)
-    }
-}
-
-const saveRecentTests = () => {
-    localStorage.setItem('recentTests', JSON.stringify(recentTests.value))
-}
-
-
-
 const openTest = (folderPath) => {
     router.push({
         name: 'testquiz',
         query: { folder: encodeURIComponent(folderPath) }
     })
 }
-</script>
 
+onMounted(() => {
+    loadRecentTests()
+})
+</script>
 
 <style scoped>
 .action-dialog-overlay {
@@ -220,6 +239,7 @@ const openTest = (folderPath) => {
 .dialog-cancel-btn:hover {
     color: #aaa;
 }
+
 #app {
     max-width: 800px;
     margin: 2rem auto;
@@ -275,6 +295,7 @@ h2 {
 }
 
 .test-item {
+    position: relative;
     background-color: #2d2d2d;
     padding: 1rem;
     margin: 0.5rem 0;
@@ -282,6 +303,26 @@ h2 {
     cursor: pointer;
     transition: background-color 0.2s ease;
     color: white;
+    padding-right: 40px;
+}
+
+.delete-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 5px;
+    transition: color 0.2s ease;
+}
+
+.delete-btn:hover {
+    color: #ff4444;
+    background: rgba(255, 68, 68, 0.1);
+    border-radius: 50%;
 }
 
 .test-item:hover {
