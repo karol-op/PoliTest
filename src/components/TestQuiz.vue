@@ -122,8 +122,9 @@ import { useRoute, useRouter } from 'vue-router';
 export default {
   name: 'TestQuiz',
   setup() {
-    // Ustawienia powtórzeń (domyślnie: additional = 1, initial = 1, max = 5)
-    const totalQuestions=ref(0);
+    console.log("Setting up TestQuiz component");
+
+    const totalQuestions = ref(0);
     const storedSettings = JSON.parse(localStorage.getItem("quizSettings") || "{}");
     const additionalRepetitions = ref(storedSettings.additionalRepetitions ?? 1);
     const initialRepetitions = ref(storedSettings.initialRepetitions ?? 1);
@@ -133,77 +134,87 @@ export default {
     const route = useRoute();
     const router = useRouter();
     const folder = decodeURIComponent(route.query.folder);
+    console.log("Folder:", folder);
     const testName = ref("Test");
     const loading = ref(true);
     const error = ref("");
 
-    // Kolejki pytań i historia
     const pendingQuestions = ref([]);
     const history = ref([]);
     const selectedAnswers = ref([]);
     const showAnswer = ref(false);
     const score = computed(() => history.value.filter(entry => entry.correct).length);
     const currentQuestionCorrect = ref(false);
-
     const currentQuestion = computed(() => pendingQuestions.value[0] || {});
     const answeredPercentage = computed(() =>
       history.value.length > 0 ? (score.value / history.value.length) * 100 : 0
     );
 
+    // Mapa przechowująca najwyższy numer powtórzenia dla każdego pytania (klucz: "fileName:question")
+    const maxDuplicateMap = ref({});
 
-
-
-
+    // Zmodyfikowana logika opanowywania pytań – sprawdzamy tylko ostatnią próbę dla danego pytania
     const masteredQuestions = computed(() => {
-  const groups = {}; // Tworzymy grupy według pytania (po nazwie pliku)
-  history.value.forEach(entry => {
-    const fileName = entry.question.fileName;
-    // Tworzymy grupę, jeżeli jeszcze nie istnieje
-    groups[fileName] = groups[fileName] || [];
-    // Sprawdzamy, czy odpowiedź była poprawna
-    groups[fileName].push(entry.correct);
-  });
-  
-  // Pytanie uznajemy za opanowane, jeśli było poprawnie odpowiedziane w jakimkolwiek powtórzeniu
-  const mastered = Object.values(groups).filter(attempts => attempts.includes(true));
-  return mastered.length;
-});
-
-
-
-
-
-
-    
-    // Aktualizacja nazwy testu
-    const checkForNameUpdate = async () => {
-      try {
-        const result = await window.electronAPI.readFile({ folder, fileName: "testname.txt" });
-        if (result.success) {
-          const newName = result.content.trim();
-          if (newName !== testName.value) {
-            testName.value = newName;
-            const recentTests = JSON.parse(localStorage.getItem("recentTests") || "[]");
-            const updatedTests = recentTests.map(t =>
-              t.folder === folder ? { ...t, name: newName } : t
-            );
-            localStorage.setItem("recentTests", JSON.stringify(updatedTests));
-          }
+      let count = 0;
+      console.log("Computing masteredQuestions");
+      for (const key in maxDuplicateMap.value) {
+        const maxRepeat = maxDuplicateMap.value[key];
+        console.log(`Checking mastery for question key: ${key} with maxRepeat: ${maxRepeat}`);
+        
+        // Pobieramy wszystkie wpisy historii dla danego pytania
+        const entries = history.value.filter(entry => {
+          const entryKey = `${entry.question.fileName}:${entry.question.question}`;
+          return entryKey === key;
+        });
+        console.log(`History entries for ${key}:`, entries);
+        
+        // Znajdujemy wpis o najwyższym numerze powtórzenia (ostatnia próba)
+        const finalEntry = entries.reduce((prev, current) => {
+          return (!prev || current.question.repeatNumber > prev.question.repeatNumber) ? current : prev;
+        }, null);
+        
+        if (finalEntry) {
+          console.log(`Final attempt for ${key}: repeatNumber ${finalEntry.question.repeatNumber}, correctness: ${finalEntry.correct}`);
+        } else {
+          console.log(`No attempts found for ${key}`);
         }
-      } catch (err) {
-        console.error("Błąd sprawdzania aktualizacji nazwy:", err);
+        
+        // Sprawdzamy, czy nie ma oczekujących instancji pytania
+        const pendingForQuestion = pendingQuestions.value.filter(q => {
+          const qKey = `${q.fileName}:${q.question}`;
+          return qKey === key;
+        });
+        console.log(`Pending questions for ${key}:`, pendingForQuestion);
+        
+        if (finalEntry && finalEntry.correct && pendingForQuestion.length === 0) {
+          console.log(`${key} is mastered (final attempt is correct and no pending instances).`);
+          count++;
+        } else {
+          console.log(`${key} is NOT mastered.`);
+        }
       }
-    };
+      console.log("Total mastered questions count:", count);
+      return count;
+    });
 
-    // Ładowanie pytań – dla każdego pytania tworzymy kopie wg initialRepetitions
+    const masteredPercentage = computed(() => {
+      const perc = totalQuestions.value > 0 ? (masteredQuestions.value / totalQuestions.value) * 100 : 0;
+      console.log("Computed masteredPercentage:", perc);
+      return perc;
+    });
+
+    // Ładowanie pytań – pobieranie listy plików, parsowanie oraz przygotowanie kolejki
     const loadQuestions = async () => {
+      console.log("loadQuestions called");
       if (!folder) {
         error.value = "Brak wybranego folderu.";
         loading.value = false;
+        console.error("Folder not provided");
         return;
       }
       try {
         const result = await window.electronAPI.listFiles(folder);
+        console.log("List files result:", result);
         if (result.success) {
           const txtFiles = result.files.filter(file =>
             file.endsWith(".txt") && file.toLowerCase() !== "testname.txt"
@@ -211,42 +222,61 @@ export default {
           totalQuestions.value = txtFiles.length;
           const loadedQuestions = [];
           for (const fileName of txtFiles) {
+            console.log(`Reading file: ${fileName}`);
             const res = await window.electronAPI.readFile({ folder, fileName });
             if (res.success) {
               const qObj = parseQuestion(res.content, fileName);
-              if (qObj) loadedQuestions.push(qObj);
+              if (qObj) {
+                loadedQuestions.push(qObj);
+                console.log(`Parsed question from ${fileName}:`, qObj);
+              } else {
+                console.warn(`Failed to parse question from ${fileName}`);
+              }
+            } else {
+              console.error(`Failed to read file: ${fileName}`);
             }
           }
           if (loadedQuestions.length === 0) {
             error.value = "Brak pytań w folderze.";
+            console.error("No questions loaded");
           } else {
             let initialQueue = [];
             loadedQuestions.forEach(q => {
+              const key = `${q.fileName}:${q.question}`;
+              console.log(`Setting initial maxRepeat for ${key}: ${initialRepetitions.value}`);
+              maxDuplicateMap.value[key] = initialRepetitions.value;
               for (let i = 1; i <= initialRepetitions.value; i++) {
                 initialQueue.push({ ...q, repeatNumber: i });
               }
             });
             pendingQuestions.value = shuffleArray(initialQueue);
+            console.log("Initial pendingQuestions:", pendingQuestions.value);
             const testNameResult = await window.electronAPI.readFile({ folder, fileName: "testname.txt" });
             if (testNameResult.success) {
               testName.value = testNameResult.content.trim();
+              console.log("Loaded testName:", testName.value);
             }
           }
         } else {
           error.value = "Nie udało się wczytać plików.";
+          console.error("Failed to list files");
         }
       } catch (e) {
-        console.error(e);
+        console.error("Error loading questions:", e);
         error.value = "Wystąpił błąd podczas wczytywania pytań.";
       } finally {
         loading.value = false;
       }
     };
 
-    // Parsowanie pytania
+    // Funkcja parsująca treść pliku do obiektu pytania
     const parseQuestion = (content, fileName) => {
+      console.log(`Parsing question from file: ${fileName}`);
       const lines = content.split("\n").map(l => l.trim()).filter(l => l !== "");
-      if (lines.length < 2) return null;
+      if (lines.length < 2) {
+        console.warn(`Not enough lines in ${fileName} to parse question`);
+        return null;
+      }
       const marker = lines[0];
       let offset = 1;
       let image = null;
@@ -263,101 +293,101 @@ export default {
         text,
         correct: bits[index] === "1"
       }));
-      return { question: questionText, image, answers, fileName };
+      const questionObj = { question: questionText, image, answers, fileName };
+      console.log(`Parsed question object from ${fileName}:`, questionObj);
+      return questionObj;
     };
 
-    // Tasowanie tablicy
+    // Funkcja mieszająca tablicę
     const shuffleArray = (array) => {
+      console.log("Shuffling array of length:", array.length);
       const newArray = array.slice();
       for (let i = newArray.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
       }
+      console.log("Shuffled array:", newArray);
       return newArray;
     };
 
-    // Obsługa wyboru odpowiedzi
     const toggleAnswer = (answer) => {
       if (showAnswer.value) return;
       const index = selectedAnswers.value.indexOf(answer);
       if (index > -1) {
         selectedAnswers.value.splice(index, 1);
+        console.log("Removed answer from selection:", answer);
       } else {
         selectedAnswers.value.push(answer);
+        console.log("Added answer to selection:", answer);
       }
+      console.log("Current selectedAnswers:", selectedAnswers.value);
     };
 
     const isSelected = (answer) => {
       return selectedAnswers.value.includes(answer);
     };
 
-    // Potwierdzenie odpowiedzi
-// Potwierdzenie odpowiedzi
-// Potwierdzenie odpowiedzi
-const confirmAnswers = () => {
-  if (selectedAnswers.value.length === 0) return;
-  
-  showAnswer.value = true; // Pokazujemy feedback po potwierdzeniu odpowiedzi
+    // Potwierdzanie odpowiedzi dla bieżącego pytania
+    const confirmAnswers = () => {
+      if (selectedAnswers.value.length === 0) return;
+      console.log("Confirming answers for current question:", currentQuestion.value);
+      showAnswer.value = true;
+      const correctAnswers = currentQuestion.value.answers.filter(a => a.correct);
+      const isCorrect = (correctAnswers.length === selectedAnswers.value.length) &&
+                        selectedAnswers.value.every(a => a.correct);
+      currentQuestionCorrect.value = isCorrect;
+      console.log("Is current question answered correctly?", isCorrect);
 
-  const correctAnswers = currentQuestion.value.answers.filter(a => a.correct);
-  const isCorrect = (correctAnswers.length === selectedAnswers.value.length) &&
-                    selectedAnswers.value.every(a => a.correct);
-  currentQuestionCorrect.value = isCorrect;
-
-  // Zapisujemy wynik do historii
-  history.value.push({
-    question: currentQuestion.value,
-    selected: [...selectedAnswers.value],
-    correct: isCorrect
-  });
-
-  // Obsługuje dodatkowe powtórzenia dla błędnych odpowiedzi
-  if (!isCorrect) {
-    const currentRepeat = currentQuestion.value.repeatNumber || 1;
-    let copies = additionalRepetitions.value + 1; // sztucznie dodajemy +1
-    const available = maximumRepetitions.value - currentRepeat;
-
-    if (copies > available) copies = available;
-
-    // Dodajemy kopie pytania z nowym numerem powtórzenia
-    for (let i = 1; i <= copies; i++) {
-      const newRepeat = currentRepeat + i;
-      if (newRepeat > maximumRepetitions.value) break;
-
-      pendingQuestions.value.push({ 
-        ...currentQuestion.value, 
-        repeatNumber: newRepeat 
+      history.value.push({
+        question: currentQuestion.value,
+        selected: [...selectedAnswers.value],
+        correct: isCorrect
       });
-    }
-  }
-};
+      console.log("Updated history:", history.value);
 
+      if (!isCorrect) {
+        const currentRepeat = currentQuestion.value.repeatNumber || 1;
+        let copies = additionalRepetitions.value + 1;
+        const available = maximumRepetitions.value - currentRepeat;
+        if (copies > available) copies = available;
+        console.log(`Current repeat: ${currentRepeat}, adding ${copies} duplicate(s)`);
+        for (let i = 1; i <= copies; i++) {
+          const newRepeat = currentRepeat + i;
+          if (newRepeat > maximumRepetitions.value) break;
+          pendingQuestions.value.push({
+            ...currentQuestion.value,
+            repeatNumber: newRepeat
+          });
+          const key = `${currentQuestion.value.fileName}:${currentQuestion.value.question}`;
+          if (!maxDuplicateMap.value[key] || maxDuplicateMap.value[key] < newRepeat) {
+            maxDuplicateMap.value[key] = newRepeat;
+            console.log(`Updated maxDuplicateMap for ${key} to ${newRepeat}`);
+          }
+        }
+      }
+      console.log("Pending questions after confirmAnswers:", pendingQuestions.value);
+    };
 
-
-    // Przechodzenie do kolejnego pytania – usuwamy bieżące pytanie z kolejki
-// Przechodzenie do kolejnego pytania – usuwamy bieżące pytanie z kolejki
-const nextQuestion = () => {
-  selectedAnswers.value = [];
-  showAnswer.value = false;
-  currentQuestionCorrect.value = false;
-  
-  // Usuwamy pytanie z kolejki
-  if (pendingQuestions.value.length > 0) {
-    pendingQuestions.value.shift();
-  }
-
-  // Tasowanie pytań po przejściu do kolejnego pytania
-  pendingQuestions.value = shuffleArray(pendingQuestions.value);
-};
-
-
+    const nextQuestion = () => {
+      console.log("Proceeding to next question");
+      selectedAnswers.value = [];
+      showAnswer.value = false;
+      currentQuestionCorrect.value = false;
+      if (pendingQuestions.value.length > 0) {
+        console.log("Current question before shift:", pendingQuestions.value[0]);
+        pendingQuestions.value.shift();
+      }
+      pendingQuestions.value = shuffleArray(pendingQuestions.value);
+      console.log("Pending questions after shuffling:", pendingQuestions.value);
+    };
 
     const goToMainMenu = () => {
+      console.log("Navigating to main menu");
       router.push("/");
     };
 
     const restartQuiz = () => {
-      score.value = 0;
+      console.log("Restarting quiz");
       history.value = [];
       selectedAnswers.value = [];
       showAnswer.value = false;
@@ -366,16 +396,24 @@ const nextQuestion = () => {
     };
 
     const openSettings = () => {
+      console.log("Opening settings popup");
       showSettingsPopup.value = true;
     };
 
     const closeSettings = () => {
+      console.log("Closing settings popup");
       showSettingsPopup.value = false;
     };
 
     const saveSettings = () => {
+      console.log("Saving settings:", {
+        additionalRepetitions: additionalRepetitions.value,
+        initialRepetitions: initialRepetitions.value,
+        maximumRepetitions: maximumRepetitions.value
+      });
       if (initialRepetitions.value > maximumRepetitions.value) {
         alert("Wstępne powtórzenia nie mogą być większe niż maksymalna liczba powtórzeń.");
+        console.error("Initial repetitions greater than maximum");
         return;
       }
       localStorage.setItem("quizSettings", JSON.stringify({
@@ -384,10 +422,15 @@ const nextQuestion = () => {
         maximumRepetitions: maximumRepetitions.value
       }));
       showSettingsPopup.value = false;
-      console.log("Nowe ustawienia:", additionalRepetitions.value, initialRepetitions.value, maximumRepetitions.value);
+    };
+
+    const checkForNameUpdate = () => {
+      console.log("Checking for test name update");
+      // Możesz tutaj dodać logikę aktualizacji nazwy testu, jeśli to potrzebne
     };
 
     onMounted(() => {
+      console.log("Component mounted");
       loadQuestions();
       const interval = setInterval(checkForNameUpdate, 5000);
       return () => clearInterval(interval);
@@ -424,6 +467,7 @@ const nextQuestion = () => {
     };
   }
 };
+
 </script>
 
 <style scoped>
