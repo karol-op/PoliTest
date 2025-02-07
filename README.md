@@ -1,19 +1,36 @@
-# PoliTest
-To-do:
-
 NA TERAZ:
 - w popupie dodawania wyjasnien zredukowac przerwe miedzy przyciskami "zapisz" i "anuluj"  CREATEQUESTIONS
--usunac mozliwosc zmieniania nazwy testu podczas quizu
--naprawic ikonke ustawien podczas quizu (kolor niebieski ustawic + naprawic ustawienie ikony)
--w menu glownym wprowadzic ustawienia ktore beda domyslnymi dla kazdego quizu (zapisywac je w zmiennych)
--usunac .txt z nazwy pliku po udzieleniu odpowiedzi
--przycisk nastepne pytanie powinien byc niebieski
--usunac "pytanie x z y"
--wprowadzic liczbe powtorzen pod nazwa pliku w quizie
--ikonka znaku zapytania ma byc na stale w kontenerze textarea input 
--przycisk wroc powinien skalowac sie identycznie jak dodaj odp, zapisz pyt
--dodac potwierdzenie przy usuwaniu ostatnio uruchamianych quizow
--olowek do zmiany nazwy testu powinien byc pod nazwa, potwierdzenie zmiany nazwy
+-przycisk wroc powinien skalowac sie identycznie jak dodaj odp, zapisz pyt CREATEQUESTIONS
+-po usunieciu pliku nie mozna modyfikowac ani wpisywac nic w textbox  CREATEQUESTIONS
+ 
 
-POZNIEJ:
--żeby było widac poprawna odpowiedz w typu y (jak bedzie quiz)
+
+
+
+
+
+
+
+ok, wszystko dziala pieknie, teraz mam kolejna duzo funkcjonalnosc do wprowadzenia do quizu. podczas tworzenia testu uzytkownik ma mozliwosc wprowadzania wyjasnien dla pytan jak i dla odpowiedzi. pytanie bez wyjasnien przykladowo wyglada nastepujaco:
+X10100
+pytanie 2
+odpowiedz prawidlowa
+nieprawidlowa
+prawidlowa
+nieprawidlowa
+nieprawidlowa
+
+a pytanie z wyjasnieniem przykladowo dla odpowiedzi pierwszej (nieprawidlowej):
+
+X10100
+pytanie 2
+odpowiedz prawidlowa
+nieprawidlowa
+[exp]wyjasnienie[/exp]
+prawidlowa
+nieprawidlowa
+nieprawidlowa
+
+. po sprawdzeniu poprawnosci odpowiedzi przez uzytkownika przy odpowiedzi oraz pytaniu dla ktorego zostalo wprowadzone wyjasnienie powinien pojawic sie przycisk, po kliknieciu ktorego wyskakuje pop-up wyjasniajacy te odpowiedz/pytanie. uzytkownik nie moze nic modyfikowac, jest to read-only.
+
+

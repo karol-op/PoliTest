@@ -2,11 +2,11 @@
   <div class="quiz-wrapper">
     <!-- Główna część quizu -->
     <div class="quiz-page">
-      <!-- Nagłówek: przycisk powrotu, wyśrodkowana nazwa quizu i przycisk ustawień -->
+      <!-- Nagłówek: przyciski powrotu, wyśrodkowana nazwa quizu i przycisk ustawień -->
       <header class="quiz-header">
-        <button @click="goToMainMenu" class="main-menu-btn">🏠︎</button>
+        <button @click="goToMainMenu" class="menu-btn">🏠</button>
         <h1 class="test-name">{{ testName }}</h1>
-        <button @click="openSettings" class="settings-btn">
+        <button @click="openSettings" class="menu-btn">
           <i class="settings-icon">⚙️</i>
         </button>
       </header>
@@ -63,38 +63,36 @@
           <div class="navigation-btns">
             <button @click="nextQuestion" class="next-btn">Następne pytanie</button>
           </div>
-          <p class="file-name">
-  {{ currentQuestion.fileName }}
-</p>
+          <p class="file-name">{{ currentQuestion.fileName }}</p>
         </div>
       </div>
     </div>
 
     <!-- Panel statystyk -->
     <div class="stats-panel">
-    <h2>Statystyki</h2>
-    
-    <!-- Sekcja odpowiedzi -->
-    <p>Odpowiedzi</p>
-    <div class="progress-container">
-      <span class="correct-count">{{ score }}</span>
-      <div class="progress-bar">
-        <div class="progress-correct" :style="{ width: answeredPercentage + '%' }"></div>
-        <div class="progress-incorrect" :style="{ width: (history.length ? (100 - answeredPercentage) : 0) + '%' }"></div>
+      <h2>Statystyki</h2>
+      
+      <!-- Sekcja odpowiedzi -->
+      <p>Odpowiedzi</p>
+      <div class="progress-container">
+        <span class="correct-count">{{ score }}</span>
+        <div class="progress-bar">
+          <div class="progress-correct" :style="{ width: answeredPercentage + '%' }"></div>
+          <div class="progress-incorrect" :style="{ width: (history.length ? (100 - answeredPercentage) : 0) + '%' }"></div>
+        </div>
+        <span class="wrong-count">{{ history.length - score }}</span>
       </div>
-      <span class="wrong-count">{{ history.length - score }}</span>
-    </div>
 
-    <!-- Nowa sekcja opanowanych pytań -->
-    <p>Opanowane pytania</p>
-    <div class="progress-container">
-      <span class="correct-count">{{ masteredQuestions }}</span>
-      <div class="progress-bar">
-        <div class="progress-correct" :style="{ width: masteredPercentage + '%' }"></div>
+      <!-- Nowa sekcja opanowanych pytań -->
+      <p>Opanowane pytania</p>
+      <div class="progress-container">
+        <span class="correct-count">{{ masteredQuestions }}</span>
+        <div class="progress-bar">
+          <div class="progress-correct" :style="{ width: masteredPercentage + '%' }"></div>
+        </div>
+        <span class="wrong-count">{{ totalQuestions - masteredQuestions }}</span>
       </div>
-      <span class="wrong-count">{{ totalQuestions - masteredQuestions }}</span>
     </div>
-  </div>
 
     <!-- Popup ustawień -->
     <div v-if="showSettingsPopup" class="settings-popup">
@@ -467,130 +465,9 @@ export default {
     };
   }
 };
-
 </script>
 
 <style scoped>
-/* Dodatkowe style dla sekcji opanowanych pytań */
-.stats-panel .progress-bar {
-  background: #444; /* Szare tło dla niewykorzystanej części */
-}
-
-.stats-panel .progress-correct {
-  background: #42b983; /* Zielony dla opanowanych */
-}
-.quiz-wrapper {
-  display: flex;
-  gap: 2rem;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.quiz-page {
-  position: relative;
-  max-width: 800px;
-  width: 100%;
-  padding: 2rem;
-  background: #1a1a1a;
-  border-radius: 8px;
-  color: #fff;
-  text-align: center;
-}
-
-.quiz-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1rem;
-  margin-bottom: 1rem;
-}
-
-.main-menu-btn {
-  position: absolute;
-  left: 0;
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 4px;
-  background: linear-gradient(135deg, #2196f3, #1976d2);
-  color: #fff;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: transform 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.main-menu-btn:hover {
-  transform: translateY(-2px);
-}
-
-.test-name {
-  flex-grow: 1;
-  text-align: center;
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.settings-btn {
-  background: linear-gradient(135deg, #2196f3, #1976d2);
-  border: none;
-  cursor: pointer;
-}
-
-.settings-icon {
-  color: #2196f3;
-  font-size: 1.8rem;
-  transition: transform 0.2s;
-}
-
-.settings-icon:hover {
-  transform: translateY(-2px);
-}
-
-.next-btn {
-  height: 40px;
-  padding: 0.8rem 1.5rem;
-  font-size: 1rem;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  background: linear-gradient(135deg, #2196f3, #1976d2);
-  color: #fff;
-  transition: transform 0.2s;
-  margin: 0.3rem;
-}
-
-.next-btn:hover {
-  transform: translateY(-2px);
-}
-
-.file-name {
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
-  color: #ccc;
-}
-
-.stats-panel {
-  width: 250px;
-  background: #2a2a2a;
-  border-radius: 8px;
-  padding: 1rem;
-  color: #fff;
-  font-size: 0.9rem;
-  text-align: center;
-}
-
-.stats-panel h2 {
-  margin-top: 0;
-}
-
-.stats-panel p {
-  margin: 0.5rem 0;
-}
-
 .progress-container {
   display: flex;
   align-items: center;
@@ -623,6 +500,87 @@ export default {
 .correct-count,
 .wrong-count {
   font-weight: bold;
+}
+/* Stylizacja nagłówka – symetryczny układ przycisków i wyśrodkowany testName */
+.quiz-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Klasa menu-btn używana zarówno dla przycisku Home jak i Ustawień */
+.menu-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #2196f3, #1976d2);
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+}
+
+.menu-btn:hover {
+  transform: translateY(-2px);
+}
+
+/* Test name wyśrodkowany między przyciskami */
+.test-name {
+  flex-grow: 1;
+  text-align: center;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+/* Pozostałe style pozostają bez zmian */
+.stats-panel {
+  width: 250px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  padding: 1rem;
+  color: #fff;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.stats-panel h2 {
+  margin-top: 0;
+}
+
+.stats-panel p {
+  margin: 0.5rem 0;
+}
+.stats-panel .progress-bar {
+  background: #444;
+}
+
+.stats-panel .progress-correct {
+  background: #42b983;
+}
+
+.quiz-wrapper {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.quiz-page {
+  position: relative;
+  max-width: 800px;
+  width: 100%;
+  padding: 2rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  color: #fff;
+  text-align: center;
 }
 
 .loading,
