@@ -1,56 +1,48 @@
 <template>
   <div class="quiz-wrapper">
-    <!-- Kontener quizu -->
+    <!-- Główna część quizu -->
     <div class="quiz-page">
-      <!-- Nagłówek z przyciskiem powrotu oraz nazwą testu -->
+      <!-- Nagłówek: przycisk powrotu, wyśrodkowana nazwa quizu i przycisk ustawień -->
       <header class="quiz-header">
-        <button @click="goToMainMenu" class="main-menu-btn">
-          🏠︎
-        </button>
+        <button @click="goToMainMenu" class="main-menu-btn">🏠︎</button>
         <h1 class="test-name">{{ testName }}</h1>
+        <button @click="openSettings" class="settings-btn">
+          <i class="settings-icon">⚙️</i>
+        </button>
       </header>
 
-      <!-- Ekran ładowania lub błąd -->
+      <!-- Ładowanie i błąd -->
       <div v-if="loading" class="loading">Ładowanie pytań...</div>
       <div v-else-if="error" class="error">{{ error }}</div>
 
-      <!-- Wynik quizu -->
-      <div v-else-if="quizFinished && reviewIndex === null">
+      <!-- Quiz zakończony -->
+      <div v-else-if="pendingQuestions.length === 0 && !loading">
         <h2>Quiz zakończony!</h2>
-        <p>Twój wynik: {{ score }} / {{ questions.length }}</p>
+        <p>Twój wynik: {{ score }} / {{ history.length }}</p>
         <button @click="restartQuiz" class="restart-btn">Restart Quiz</button>
       </div>
 
-      <!-- Wyświetlanie bieżącego lub przeglądowego pytania -->
+      <!-- Aktualne pytanie -->
       <div v-else>
         <div class="question-section">
-          <p>
-            Pytanie
-            <span v-if="!isReview">{{ currentQuestionIndex + 1 }}</span>
-            <span v-else>{{ reviewIndex + 1 }}</span>
-            z {{ questions.length }}
-          </p>
-          <h2 class="question-text">{{ displayedQuestion.question }}</h2>
-          <img v-if="displayedQuestion.image"
-               :src="displayedQuestion.image"
-               alt="Obrazek do pytania"
-               class="question-image" />
+          <p>Pytanie {{ history.length + 1 }} z {{ history.length + pendingQuestions.length }}</p>
+          <h2 class="question-text">{{ currentQuestion.question }}</h2>
+          <img v-if="currentQuestion.image" :src="currentQuestion.image" alt="Obrazek do pytania" class="question-image" />
         </div>
 
         <div class="answers-section">
           <ul>
-            <li v-for="(answer, index) in displayedQuestion.answers"
-                :key="index" class="answer-item">
+            <li v-for="(answer, index) in currentQuestion.answers" :key="index" class="answer-item">
               <button @click="toggleAnswer(answer)"
                       :class="[
                         isSelected(answer) ? 'selected' : '',
                         {
-                          correct: showAnswerForDisplayed && isSelected(answer) && answer.correct,
-                          missed: showAnswerForDisplayed && !isSelected(answer) && answer.correct,
-                          incorrect: showAnswerForDisplayed && isSelected(answer) && !answer.correct
+                          correct: showAnswer && isSelected(answer) && answer.correct,
+                          missed: showAnswer && !isSelected(answer) && answer.correct,
+                          incorrect: showAnswer && isSelected(answer) && !answer.correct
                         }
                       ]"
-                      :disabled="showAnswerForDisplayed"
+                      :disabled="showAnswer"
                       class="answer-btn">
                 {{ answer.text }}
                 <span v-if="isSelected(answer)" class="checkmark">✓</span>
@@ -59,122 +51,151 @@
           </ul>
         </div>
 
-        <!-- Przyciski potwierdzające wybór oraz informacja zwrotna -->
-        <div v-if="!showAnswerForDisplayed && !isReview" class="confirmation">
+        <!-- Feedback oraz przycisk "Następne pytanie" -->
+        <div v-if="!showAnswer" class="confirmation">
           <button @click="confirmAnswers" class="confirm-btn" :disabled="selectedAnswers.length === 0">
             Potwierdź wybory
           </button>
         </div>
-
-        <div v-if="showAnswerForDisplayed" class="feedback">
-          <p v-if="displayedQuestionCorrect" class="feedback-correct">Poprawna odpowiedź!</p>
+        <div v-if="showAnswer" class="feedback">
+          <p v-if="currentQuestionCorrect" class="feedback-correct">Poprawna odpowiedź!</p>
           <p v-else class="feedback-incorrect">Niepoprawna odpowiedź.</p>
-          <!-- Nawigacja oraz wyświetlenie nazwy pliku w zależności od trybu -->
-          <template v-if="!isReview">
-            <div class="navigation-btns">
-              <button v-if="currentQuestionIndex > 0 && answersHistory[currentQuestionIndex - 1]"
-                      @click="reviewPrevious" class="prev-btn">
-                ←
-              </button>
-              <button @click="nextQuestion" class="next-btn">Następne pytanie</button>
-            </div>
-            <p class="file-name">{{ displayedQuestion.fileName }}</p>
-          </template>
-          <template v-else>
-            <button @click="exitReview" class="next-btn">Powrót do bieżącego pytania</button>
-          </template>
+          <div class="navigation-btns">
+            <button @click="nextQuestion" class="next-btn">Następne pytanie</button>
+          </div>
+          <p class="file-name">
+  {{ currentQuestion.fileName }}
+</p>
         </div>
       </div>
     </div>
 
     <!-- Panel statystyk -->
     <div class="stats-panel">
-      <h2>Statystyki</h2>
-      <p>Udzielone odpowiedzi</p>
-      <div class="progress-container">
-        <span class="correct-count">{{ score }}</span>
-        <div class="progress-bar">
-          <div class="progress-correct" :style="{ width: answeredCount > 0 ? progressPercentage + '%' : '0%' }"></div>
-          <div class="progress-incorrect" :style="{ width: answeredCount > 0 ? (100 - progressPercentage) + '%' : '0%' }"></div>
+    <h2>Statystyki</h2>
+    
+    <!-- Sekcja odpowiedzi -->
+    <p>Odpowiedzi</p>
+    <div class="progress-container">
+      <span class="correct-count">{{ score }}</span>
+      <div class="progress-bar">
+        <div class="progress-correct" :style="{ width: answeredPercentage + '%' }"></div>
+        <div class="progress-incorrect" :style="{ width: (history.length ? (100 - answeredPercentage) : 0) + '%' }"></div>
+      </div>
+      <span class="wrong-count">{{ history.length - score }}</span>
+    </div>
+
+    <!-- Nowa sekcja opanowanych pytań -->
+    <p>Opanowane pytania</p>
+    <div class="progress-container">
+      <span class="correct-count">{{ masteredQuestions }}</span>
+      <div class="progress-bar">
+        <div class="progress-correct" :style="{ width: masteredPercentage + '%' }"></div>
+      </div>
+      <span class="wrong-count">{{ totalQuestions - masteredQuestions }}</span>
+    </div>
+  </div>
+
+    <!-- Popup ustawień -->
+    <div v-if="showSettingsPopup" class="settings-popup">
+      <div class="settings-content">
+        <h2>Ustawienia powtórzeń</h2>
+        <label>Dodatkowe powtórzenia przy błędnej odpowiedzi:</label>
+        <input type="number" v-model.number="additionalRepetitions" min="0" />
+        <label>Wstępne powtórzenia:</label>
+        <input type="number" v-model.number="initialRepetitions" min="1" />
+        <label>Maksymalna liczba powtórzeń:</label>
+        <input type="number" v-model.number="maximumRepetitions" min="1" />
+        <div class="popup-buttons">
+          <button @click="saveSettings">Zapisz</button>
+          <button @click="closeSettings" class="cancel-btn">Anuluj</button>
         </div>
-        <span class="wrong-count">{{ answeredCount - score }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 export default {
-  name: "TestQuiz",
+  name: 'TestQuiz',
   setup() {
+    // Ustawienia powtórzeń (domyślnie: additional = 1, initial = 1, max = 5)
+    const totalQuestions=ref(0);
+    const storedSettings = JSON.parse(localStorage.getItem("quizSettings") || "{}");
+    const additionalRepetitions = ref(storedSettings.additionalRepetitions ?? 1);
+    const initialRepetitions = ref(storedSettings.initialRepetitions ?? 1);
+    const maximumRepetitions = ref(storedSettings.maximumRepetitions ?? 5);
+    const showSettingsPopup = ref(false);
+
     const route = useRoute();
     const router = useRouter();
     const folder = decodeURIComponent(route.query.folder);
     const testName = ref("Test");
     const loading = ref(true);
     const error = ref("");
-    const questions = ref([]);
-    const currentQuestionIndex = ref(0);
-    const answersHistory = ref([]);
+
+    // Kolejki pytań i historia
+    const pendingQuestions = ref([]);
+    const history = ref([]);
     const selectedAnswers = ref([]);
     const showAnswer = ref(false);
-    const score = ref(0);
-    const reviewIndex = ref(null);
-    const isReview = computed(() => reviewIndex.value !== null);
-    const currentQuestion = computed(() => questions.value[currentQuestionIndex.value]);
-    const displayedQuestion = computed(() =>
-      isReview.value ? questions.value[reviewIndex.value] : currentQuestion.value
-    );
-    const showAnswerForDisplayed = computed(() => isReview.value || showAnswer.value);
-    const displayedSelectedAnswers = computed(() => {
-      if (isReview.value) {
-        return answersHistory.value[reviewIndex.value] ? answersHistory.value[reviewIndex.value].selected : [];
-      } else {
-        return selectedAnswers.value;
-      }
-    });
-    const displayedQuestionCorrect = computed(() => {
-      if (isReview.value) {
-        return answersHistory.value[reviewIndex.value] ? answersHistory.value[reviewIndex.value].correct : false;
-      } else {
-        return showAnswer.value && currentQuestionCorrect.value;
-      }
-    });
+    const score = computed(() => history.value.filter(entry => entry.correct).length);
     const currentQuestionCorrect = ref(false);
-    const quizFinished = computed(
-      () => currentQuestionIndex.value >= questions.value.length && !isReview.value
-    );
-    const answeredCount = computed(() => answersHistory.value.filter(entry => entry !== undefined).length);
-    const progressPercentage = computed(() => {
-      return answeredCount.value > 0 ? (score.value / answeredCount.value) * 100 : 0;
-    });
 
+    const currentQuestion = computed(() => pendingQuestions.value[0] || {});
+    const answeredPercentage = computed(() =>
+      history.value.length > 0 ? (score.value / history.value.length) * 100 : 0
+    );
+
+
+
+
+
+    const masteredQuestions = computed(() => {
+  const groups = {}; // Tworzymy grupy według pytania (po nazwie pliku)
+  history.value.forEach(entry => {
+    const fileName = entry.question.fileName;
+    // Tworzymy grupę, jeżeli jeszcze nie istnieje
+    groups[fileName] = groups[fileName] || [];
+    // Sprawdzamy, czy odpowiedź była poprawna
+    groups[fileName].push(entry.correct);
+  });
+  
+  // Pytanie uznajemy za opanowane, jeśli było poprawnie odpowiedziane w jakimkolwiek powtórzeniu
+  const mastered = Object.values(groups).filter(attempts => attempts.includes(true));
+  return mastered.length;
+});
+
+
+
+
+
+
+    
+    // Aktualizacja nazwy testu
     const checkForNameUpdate = async () => {
       try {
-        const result = await window.electronAPI.readFile({
-          folder,
-          fileName: "testname.txt"
-        });
+        const result = await window.electronAPI.readFile({ folder, fileName: "testname.txt" });
         if (result.success) {
           const newName = result.content.trim();
           if (newName !== testName.value) {
             testName.value = newName;
-            // Aktualizuj localStorage na stronie głównej
-            const recentTests = JSON.parse(localStorage.getItem('recentTests') || '[]');
-            const updatedTests = recentTests.map(t => 
-              t.folder === folder ? {...t, name: newName} : t
+            const recentTests = JSON.parse(localStorage.getItem("recentTests") || "[]");
+            const updatedTests = recentTests.map(t =>
+              t.folder === folder ? { ...t, name: newName } : t
             );
-            localStorage.setItem('recentTests', JSON.stringify(updatedTests));
+            localStorage.setItem("recentTests", JSON.stringify(updatedTests));
           }
         }
-      } catch (error) {
-        console.error('Błąd sprawdzania aktualizacji nazwy:', error);
+      } catch (err) {
+        console.error("Błąd sprawdzania aktualizacji nazwy:", err);
       }
     };
 
+    // Ładowanie pytań – dla każdego pytania tworzymy kopie wg initialRepetitions
     const loadQuestions = async () => {
       if (!folder) {
         error.value = "Brak wybranego folderu.";
@@ -187,20 +208,25 @@ export default {
           const txtFiles = result.files.filter(file =>
             file.endsWith(".txt") && file.toLowerCase() !== "testname.txt"
           );
+          totalQuestions.value = txtFiles.length;
           const loadedQuestions = [];
           for (const fileName of txtFiles) {
             const res = await window.electronAPI.readFile({ folder, fileName });
             if (res.success) {
               const qObj = parseQuestion(res.content, fileName);
-              if (qObj) {
-                loadedQuestions.push(qObj);
-              }
+              if (qObj) loadedQuestions.push(qObj);
             }
           }
           if (loadedQuestions.length === 0) {
             error.value = "Brak pytań w folderze.";
           } else {
-            questions.value = shuffleArray(loadedQuestions);
+            let initialQueue = [];
+            loadedQuestions.forEach(q => {
+              for (let i = 1; i <= initialRepetitions.value; i++) {
+                initialQueue.push({ ...q, repeatNumber: i });
+              }
+            });
+            pendingQuestions.value = shuffleArray(initialQueue);
             const testNameResult = await window.electronAPI.readFile({ folder, fileName: "testname.txt" });
             if (testNameResult.success) {
               testName.value = testNameResult.content.trim();
@@ -217,6 +243,7 @@ export default {
       }
     };
 
+    // Parsowanie pytania
     const parseQuestion = (content, fileName) => {
       const lines = content.split("\n").map(l => l.trim()).filter(l => l !== "");
       if (lines.length < 2) return null;
@@ -236,10 +263,10 @@ export default {
         text,
         correct: bits[index] === "1"
       }));
-      const shuffledAnswers = shuffleArray(answers);
-      return { question: questionText, image, answers: shuffledAnswers, fileName };
+      return { question: questionText, image, answers, fileName };
     };
 
+    // Tasowanie tablicy
     const shuffleArray = (array) => {
       const newArray = array.slice();
       for (let i = newArray.length - 1; i > 0; i--) {
@@ -249,72 +276,115 @@ export default {
       return newArray;
     };
 
+    // Obsługa wyboru odpowiedzi
     const toggleAnswer = (answer) => {
-      if (showAnswerForDisplayed.value) return;
-      if (!isReview.value) {
-        const index = selectedAnswers.value.indexOf(answer);
-        if (index > -1) {
-          selectedAnswers.value.splice(index, 1);
-        } else {
-          selectedAnswers.value.push(answer);
-        }
+      if (showAnswer.value) return;
+      const index = selectedAnswers.value.indexOf(answer);
+      if (index > -1) {
+        selectedAnswers.value.splice(index, 1);
+      } else {
+        selectedAnswers.value.push(answer);
       }
     };
 
     const isSelected = (answer) => {
-      return displayedSelectedAnswers.value.includes(answer);
+      return selectedAnswers.value.includes(answer);
     };
 
-    const confirmAnswers = () => {
-      if (selectedAnswers.value.length === 0) return;
-      showAnswer.value = true;
-      const correctAnswers = currentQuestion.value.answers.filter(a => a.correct);
-      const isAnswerCorrect = correctAnswers.length === selectedAnswers.value.length &&
-                              selectedAnswers.value.every(a => a.correct);
-      currentQuestionCorrect.value = isAnswerCorrect;
-      if (isAnswerCorrect) {
-        score.value++;
-      }
-      answersHistory.value[currentQuestionIndex.value] = {
-        selected: [...selectedAnswers.value],
-        correct: isAnswerCorrect
-      };
-    };
+    // Potwierdzenie odpowiedzi
+// Potwierdzenie odpowiedzi
+// Potwierdzenie odpowiedzi
+const confirmAnswers = () => {
+  if (selectedAnswers.value.length === 0) return;
+  
+  showAnswer.value = true; // Pokazujemy feedback po potwierdzeniu odpowiedzi
 
-    const nextQuestion = () => {
-      selectedAnswers.value = [];
-      showAnswer.value = false;
-      currentQuestionCorrect.value = false;
-      if (isReview.value) {
-        reviewIndex.value = null;
-      } else {
-        currentQuestionIndex.value++;
-      }
-    };
+  const correctAnswers = currentQuestion.value.answers.filter(a => a.correct);
+  const isCorrect = (correctAnswers.length === selectedAnswers.value.length) &&
+                    selectedAnswers.value.every(a => a.correct);
+  currentQuestionCorrect.value = isCorrect;
 
-    const reviewPrevious = () => {
-      if (currentQuestionIndex.value > 0 && answersHistory.value[currentQuestionIndex.value - 1]) {
-        reviewIndex.value = currentQuestionIndex.value - 1;
-      }
-    };
+  // Zapisujemy wynik do historii
+  history.value.push({
+    question: currentQuestion.value,
+    selected: [...selectedAnswers.value],
+    correct: isCorrect
+  });
 
-    const exitReview = () => {
-      reviewIndex.value = null;
-    };
+  // Obsługuje dodatkowe powtórzenia dla błędnych odpowiedzi
+  if (!isCorrect) {
+    const currentRepeat = currentQuestion.value.repeatNumber || 1;
+    let copies = additionalRepetitions.value + 1; // sztucznie dodajemy +1
+    const available = maximumRepetitions.value - currentRepeat;
+
+    if (copies > available) copies = available;
+
+    // Dodajemy kopie pytania z nowym numerem powtórzenia
+    for (let i = 1; i <= copies; i++) {
+      const newRepeat = currentRepeat + i;
+      if (newRepeat > maximumRepetitions.value) break;
+
+      pendingQuestions.value.push({ 
+        ...currentQuestion.value, 
+        repeatNumber: newRepeat 
+      });
+    }
+  }
+};
+
+
+
+    // Przechodzenie do kolejnego pytania – usuwamy bieżące pytanie z kolejki
+// Przechodzenie do kolejnego pytania – usuwamy bieżące pytanie z kolejki
+const nextQuestion = () => {
+  selectedAnswers.value = [];
+  showAnswer.value = false;
+  currentQuestionCorrect.value = false;
+  
+  // Usuwamy pytanie z kolejki
+  if (pendingQuestions.value.length > 0) {
+    pendingQuestions.value.shift();
+  }
+
+  // Tasowanie pytań po przejściu do kolejnego pytania
+  pendingQuestions.value = shuffleArray(pendingQuestions.value);
+};
+
+
 
     const goToMainMenu = () => {
       router.push("/");
     };
 
     const restartQuiz = () => {
-      currentQuestionIndex.value = 0;
       score.value = 0;
-      questions.value = shuffleArray(questions.value);
+      history.value = [];
       selectedAnswers.value = [];
       showAnswer.value = false;
       currentQuestionCorrect.value = false;
-      answersHistory.value = [];
-      reviewIndex.value = null;
+      loadQuestions();
+    };
+
+    const openSettings = () => {
+      showSettingsPopup.value = true;
+    };
+
+    const closeSettings = () => {
+      showSettingsPopup.value = false;
+    };
+
+    const saveSettings = () => {
+      if (initialRepetitions.value > maximumRepetitions.value) {
+        alert("Wstępne powtórzenia nie mogą być większe niż maksymalna liczba powtórzeń.");
+        return;
+      }
+      localStorage.setItem("quizSettings", JSON.stringify({
+        additionalRepetitions: additionalRepetitions.value,
+        initialRepetitions: initialRepetitions.value,
+        maximumRepetitions: maximumRepetitions.value
+      }));
+      showSettingsPopup.value = false;
+      console.log("Nowe ustawienia:", additionalRepetitions.value, initialRepetitions.value, maximumRepetitions.value);
     };
 
     onMounted(() => {
@@ -324,40 +394,47 @@ export default {
     });
 
     return {
-      folder,
       testName,
       loading,
       error,
-      questions,
-      currentQuestionIndex,
-      currentQuestion,
-      displayedQuestion,
+      pendingQuestions,
+      history,
       selectedAnswers,
+      showAnswer,
+      score,
+      currentQuestion,
+      currentQuestionCorrect,
+      answeredPercentage,
       isSelected,
       confirmAnswers,
       toggleAnswer,
       nextQuestion,
-      restartQuiz,
-      score,
-      quizFinished,
-      currentQuestionCorrect,
-      showAnswerForDisplayed,
-      displayedQuestionCorrect,
-      reviewPrevious,
-      exitReview,
-      isReview,
-      reviewIndex,
-      answersHistory,
       goToMainMenu,
-      answeredCount,
-      progressPercentage
+      restartQuiz,
+      openSettings,
+      closeSettings,
+      saveSettings,
+      additionalRepetitions,
+      initialRepetitions,
+      maximumRepetitions,
+      showSettingsPopup,
+      totalQuestions,
+      masteredQuestions,
+      masteredPercentage
     };
   }
 };
 </script>
 
-
 <style scoped>
+/* Dodatkowe style dla sekcji opanowanych pytań */
+.stats-panel .progress-bar {
+  background: #444; /* Szare tło dla niewykorzystanej części */
+}
+
+.stats-panel .progress-correct {
+  background: #42b983; /* Zielony dla opanowanych */
+}
 .quiz-wrapper {
   display: flex;
   gap: 2rem;
@@ -377,18 +454,17 @@ export default {
   text-align: center;
 }
 
-/* Nagłówek z przyciskiem powrotu i nazwą testu */
 .quiz-header {
   display: flex;
   align-items: center;
-  justify-content: center; /* Wycentrowanie zawartości */
-  position: relative;      /* Potrzebne dla absolutnego pozycjonowania przycisku */
+  justify-content: space-between;
+  padding: 0 1rem;
   margin-bottom: 1rem;
 }
 
 .main-menu-btn {
   position: absolute;
-  left: 0; /* Umiejscowienie przycisku po lewej */
+  left: 0;
   width: 40px;
   height: 40px;
   border: none;
@@ -408,7 +484,26 @@ export default {
 }
 
 .test-name {
+  flex-grow: 1;
+  text-align: center;
   margin: 0;
+  font-size: 1.5rem;
+}
+
+.settings-btn {
+  background: linear-gradient(135deg, #2196f3, #1976d2);
+  border: none;
+  cursor: pointer;
+}
+
+.settings-icon {
+  color: #2196f3;
+  font-size: 1.8rem;
+  transition: transform 0.2s;
+}
+
+.settings-icon:hover {
+  transform: translateY(-2px);
 }
 
 .next-btn {
@@ -428,14 +523,12 @@ export default {
   transform: translateY(-2px);
 }
 
-/* Nazwa pliku */
 .file-name {
   margin-top: 0.5rem;
   font-size: 0.9rem;
   color: #ccc;
 }
 
-/* Panel statystyk */
 .stats-panel {
   width: 250px;
   background: #2a2a2a;
@@ -454,7 +547,6 @@ export default {
   margin: 0.5rem 0;
 }
 
-/* Pasek postępu */
 .progress-container {
   display: flex;
   align-items: center;
@@ -489,7 +581,6 @@ export default {
   font-weight: bold;
 }
 
-/* Reszta stylów */
 .loading,
 .error {
   font-size: 1.2rem;
@@ -634,5 +725,67 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.settings-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.settings-content {
+  background: #1a1a1a;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 300px;
+  text-align: center;
+}
+
+.settings-content h2 {
+  margin-top: 0;
+  color: #fff;
+}
+
+.settings-content label {
+  display: block;
+  margin: 1rem 0 0.5rem;
+  text-align: left;
+  color: #fff;
+}
+
+.settings-content input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #2a2a2a;
+  color: #fff;
+}
+
+.settings-content button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #2196f3, #1976d2);
+  color: #fff;
+  cursor: pointer;
+}
+
+.settings-content .cancel-btn {
+  background: #ff4444;
+  margin-left: 0.5rem;
+}
+
+.popup-buttons {
+  display: flex;
+  justify-content: center;
 }
 </style>

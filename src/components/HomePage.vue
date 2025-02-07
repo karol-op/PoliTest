@@ -46,11 +46,22 @@
                     class="test-item"
                     @click="openTest(test.folder)">
                     {{ test.name }}
-                    <button @click.stop="deleteTest(index)" class="delete-btn" title="Usuń z listy">
+                    <button @click.stop="confirmDeleteTest(index)" class="delete-btn" title="Usuń z listy">
                         🗑️
                     </button>
                 </li>
             </ul>
+        </div>
+
+        <!-- Okno potwierdzenia usunięcia quizu -->
+        <div v-if="showDeleteConfirmation" class="delete-confirmation-overlay">
+            <div class="delete-confirmation">
+                <h3>Czy na pewno chcesz usunąć ten test?</h3>
+                <div class="confirmation-buttons">
+                    <button @click="deleteTest(selectedTestIndex)" class="confirm-delete-btn">Tak, usuń</button>
+                    <button @click="cancelDelete" class="cancel-delete-btn">Anuluj</button>
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -67,6 +78,10 @@ const showActionDialog = ref(false)
 // Nowe zmienne do przechowywania wybranego folderu oraz nazwy testu
 const selectedFolder = ref(null)
 const selectedTestName = ref(null)
+
+// Nowe zmienne do obsługi potwierdzenia usunięcia
+const showDeleteConfirmation = ref(false)
+const selectedTestIndex = ref(null)
 
 const loadRecentTests = async () => {
     const storedTests = localStorage.getItem('recentTests')
@@ -100,9 +115,22 @@ const saveRecentTests = () => {
 const deleteTest = (index) => {
     recentTests.value.splice(index, 1)
     saveRecentTests()
+    showDeleteConfirmation.value = false // Zamknięcie okna potwierdzenia po usunięciu
 }
 
-// Funkcja wywoływana przy kliknięciu w "Wczytaj test" – otwiera dialog wyboru folderu
+// Funkcja uruchamiana przy kliknięciu przycisku "Usuń"
+const confirmDeleteTest = (index) => {
+    selectedTestIndex.value = index
+    showDeleteConfirmation.value = true
+}
+
+// Funkcja do anulowania usunięcia
+const cancelDelete = () => {
+    showDeleteConfirmation.value = false
+    selectedTestIndex.value = null
+}
+
+// Funkcja wywoływana przy kliknięciu w "Wczytaj test" – otwiera okno wyboru folderu
 const selectFolderForTest = () => {
     folderInput.value.click()
 }
@@ -152,6 +180,7 @@ const updateRecentTests = (name, folder) => {
     if (recentTests.value.length > 5) {
         recentTests.value = recentTests.value.slice(0, 5)
     }
+    saveRecentTests()
 }
 
 // Funkcja wybierająca akcję – korzysta z wcześniej wybranego folderu i nazwy testu
@@ -159,10 +188,8 @@ const selectAction = (action) => {
     showActionDialog.value = false
     if (action === 'quiz') {
         updateRecentTests(selectedTestName.value, selectedFolder.value)
-        saveRecentTests()
     }
     navigateToTest(selectedFolder.value, action)
-    // Czyszczenie przechowywanych danych
     selectedFolder.value = null
     selectedTestName.value = null
 }
@@ -260,6 +287,64 @@ onMounted(() => {
 
 .dialog-cancel-btn:hover {
     color: #aaa;
+}
+
+.delete-confirmation-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.delete-confirmation {
+    background: #2d2d2d;
+    padding: 2rem;
+    border-radius: 12px;
+    text-align: center;
+    width: 400px;
+}
+
+.delete-confirmation h3 {
+    color: white;
+    margin-bottom: 1.5rem;
+}
+
+.confirmation-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+.confirm-delete-btn,
+.cancel-delete-btn {
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.confirm-delete-btn {
+    background: #ff4444;
+    color: white;
+}
+
+.confirm-delete-btn:hover {
+    background: #ff3333;
+}
+
+.cancel-delete-btn {
+    background: #2196f3;
+    color: white;
+}
+
+.cancel-delete-btn:hover {
+    background: #1976d2;
 }
 
 #app {
