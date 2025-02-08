@@ -1,4 +1,4 @@
-
+-obsluga rarow
 -add y type questions (with filling)
 -when quiz done, it shouldn't ask whether to save
 -cant exit via test site and windows x button

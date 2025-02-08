@@ -41,6 +41,7 @@
                     </div>
                     <img v-if="displayedQuestion.image"
                          :src="displayedQuestion.image"
+                         @click="zoomImage(displayedQuestion.image)"
                          alt="Obrazek do pytania"
                          class="question-image" />
                 </div>
@@ -79,7 +80,13 @@
                 </div>
             </div>
         </div>
-
+        <!-- Popup powiększonego obrazka -->
+        <div v-if="showZoomedImage" class="image-zoom-popup" @click.self="closeZoom">
+            <div class="zoomed-image-container">
+                <img :src="currentZoomedImage" alt="Powiększony obrazek" class="zoomed-image" />
+                <button @click="closeZoom" class="close-zoom-btn">×</button>
+            </div>
+        </div>
         <!-- Panel statystyk -->
         <div class="stats-panel">
             <h2>Statystyki</h2>
@@ -141,6 +148,21 @@
         name: 'TestQuiz',
         setup() {
             console.log("Setting up TestQuiz component");
+
+            // Zoom obrazka
+            const showZoomedImage = ref(false);
+            const currentZoomedImage = ref(null);
+
+            const zoomImage = (imageUrl) => {
+                console.log("Zooming image:", imageUrl); // Debugowanie
+                currentZoomedImage.value = imageUrl;
+                showZoomedImage.value = true;
+            };
+
+            const closeZoom = () => {
+                showZoomedImage.value = false;
+                currentZoomedImage.value = null;
+            };
 
             // Ustawienia quizu
             const totalQuestions = ref(0);
@@ -578,6 +600,10 @@
                 openSettings,
                 closeSettings,
                 saveSettings,
+                showZoomedImage,
+                currentZoomedImage,
+                zoomImage,
+                closeZoom,
                 saveProgress
             };
         }
@@ -585,6 +611,58 @@
 </script>
 
 <style scoped>
+    .image-zoom-popup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        cursor: zoom-out;
+    }
+
+    .zoomed-image-container {
+        position: relative;
+        max-width: 90%;
+        max-height: 90%;
+    }
+
+    .zoomed-image {
+        max-width: 100%;
+        max-height: 80vh;
+        object-fit: contain;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .close-zoom-btn {
+        position: relative;
+        top: -433px;
+        right: 53px;
+        font-size: 3rem;
+        color: red;
+        background: none;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+        .close-zoom-btn:hover {
+            transform: scale(1.2);
+        }
+
+    .question-image {
+        cursor: zoom-in;
+        transition: transform 0.2s;
+    }
+
+        .question-image:hover {
+            transform: scale(1.02);
+        }
     .quiz-wrapper {
         display: flex;
         gap: 2rem;
