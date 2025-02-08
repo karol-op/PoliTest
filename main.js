@@ -33,27 +33,29 @@ app.whenReady().then(() => {
     return result.filePaths[0];
   });
 
-  ipcMain.handle('save-file', async (event, { folder, fileName, fileContent }) => {
-    try {
-      const filePath = path.join(folder, fileName);
-      await fs.writeFile(filePath, fileContent, 'utf8');
-      return { success: true };
-    } catch (error) {
-      console.error('Error saving file:', error);
-      return { success: false, error: error.message };
-    }
-  });
+    ipcMain.handle('save-file', async (event, { folder, fileName, fileContent, isBinary = false }) => {
+        try {
+            const filePath = path.join(folder, fileName);
+            await fs.writeFile(filePath, fileContent, isBinary ? null : 'utf8');
+            return { success: true };
+        } catch (error) {
+            console.error('Błąd zapisu pliku:', error);
+            return { success: false, message: 'Błąd zapisu pliku' };
+        }
+    });
 
-  ipcMain.handle('read-file', async (event, { folder, fileName }) => {
-    try {
-      const filePath = path.join(folder, fileName);
-      const content = await fs.readFile(filePath, 'utf8');
-      return { success: true, content };
-    } catch (error) {
-      console.error('Błąd odczytu pliku:', error);
-      return { success: false, message: 'Błąd odczytu pliku' };
-    }
-  });
+
+    ipcMain.handle('read-file', async (event, { folder, fileName, isBinary = false }) => {
+        try {
+            const filePath = path.join(folder, fileName);
+            const content = await fs.readFile(filePath, isBinary ? null : 'utf8'); // Binary mode when needed
+            return { success: true, content };
+        } catch (error) {
+            console.error('Błąd odczytu pliku:', error);
+            return { success: false, message: 'Błąd odczytu pliku' };
+        }
+    });
+
   ipcMain.handle('delete-file', async (_, { folder, fileName }) => {
     const filePath = path.join(folder, fileName);
     try {
@@ -81,104 +83,90 @@ app.whenReady().then(() => {
         const result = await dialog.showSaveDialog(options);
         return result;
     });
-    ipcMain.handle('export-pdf', async (event, options) => {
-        console.log('Eksportowanie PDF z opcjami:', options);
+ipcMain.handle('export-pdf', async (event, options) => {
+    console.log('Eksportowanie PDF z opcjami:', options);
 
-        const PDFDocument = require('pdfkit');
-        const fs = require('fs');
+    const PDFDocument = require('pdfkit');
+    const fs = require('fs');
+    const { pdfContent, savePath } = options;
 
-        // Funkcja usuwająca znaki diakrytyczne
-        const removeDiacritics = (str) => {
-            if (!str) return '';
-            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        };
+    const removeDiacritics = (str) => {
+        if (!str) return '';
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    };
 
-        try {
-            const { pdfContent, savePath } = options;
+    try {
+        const doc = new PDFDocument();
+        const writeStream = fs.createWriteStream(savePath);
+        doc.pipe(writeStream);
 
-            // Utwórz nowy dokument PDF
-            const doc = new PDFDocument();
-            const writeStream = fs.createWriteStream(savePath);
-            doc.pipe(writeStream);
+        const title = removeDiacritics(pdfContent.testName);
+        doc.fontSize(20).text(title, { align: 'center' });
+        doc.moveDown();
 
-            // Dodaj tytuł (nazwa testu) – usuwamy diakrytyki
-            const title = removeDiacritics(pdfContent.testName);
-            doc.fontSize(20).text(title, { align: 'center' });
-            doc.moveDown();
+        for (const q of pdfContent.questions) {
+            const questionText = `${pdfContent.questions.indexOf(q) + 1}. ${removeDiacritics(q.question)}`;
+            doc.fontSize(14).text(questionText);
 
-            // Iteracja przez wszystkie pytania
-            for (const q of pdfContent.questions) {
-                // Numerujemy pytanie i wypisujemy treść pytania (usuwamy diakrytyki)
-                const questionText = `${pdfContent.questions.indexOf(q) + 1}. ${removeDiacritics(q.question)}`;
-                doc.fontSize(14).text(questionText);
-
-                // Jeśli pytanie zawiera obraz, wstawiamy go do PDF
-                if (q.image) {
-                    try {
-                        doc.moveDown();
-                        doc.image(q.image, {
-                            fit: [400, 250], // Skalowanie do mniejszych wymiarów
-                            align: 'center'
-                        });
-                        doc.moveDown(); // Dodajemy odstęp po obrazie
-                    } catch (error) {
-                        console.error('Błąd podczas wstawiania obrazu:', error);
-                    }
+            if (q.image) {
+                try {
+                    // Get image dimensions to calculate scaling
+                    const imageStats = fs.statSync(q.image);
+                    const image = doc.image(q.image, {
+                        fit: [400, 250], // Maintain aspect ratio, fit within bounds
+                        align: 'center',
+                        // Add below line to avoid overlapping
+                        // moveDown: 1 // Add some space after the image
+                    });
+                    doc.moveDown(1); // Add some space after the image
+                    // or
+                    // doc.moveDown(image.height + 10); // Add space based on image height + margin
+                } catch (imageError) {
+                    console.error('Błąd podczas wstawiania obrazu:', imageError);
+                    doc.fontSize(12).fillColor('red').text("Błąd: Nie można załadować obrazu.", { align: 'center' });
+                    doc.fillColor('black'); // Reset color
                 }
-
-
-                // Jeśli mamy wyjaśnienie pytania i użytkownik wybrał opcję eksportu wyjaśnień, wypisujemy je
-                if (q.explanation && pdfContent.options.includeExplanations) {
-                    const explanationText = "Wyjaśnienie: " + removeDiacritics(q.explanation);
-                    doc.fontSize(12)
-                        .fillColor('gray')
-                        .text(explanationText, { indent: 20 });
-                    doc.fillColor('black');
-                }
-
-                // Wypisanie odpowiedzi
-                q.answers.forEach((ans, i) => {
-                    // Używamy liter (A, B, C, ...) do oznaczenia odpowiedzi
-                    const answerPrefix = String.fromCharCode(65 + i) + ". ";
-                    let answerText = answerPrefix + removeDiacritics(ans.text);
-
-                    // Jeśli użytkownik chce eksportować poprawne odpowiedzi i ta odpowiedź jest poprawna
-                    if (pdfContent.options.includeCorrectAnswers && ans.correct) {
-                        answerText += " (poprawna)";
-                    }
-                    doc.fontSize(12).text(answerText, { indent: 20 });
-
-                    // Jeśli dla odpowiedzi dostępne jest wyjaśnienie i użytkownik wybrał opcję eksportu wyjaśnień
-                    if (ans.explanation && pdfContent.options.includeExplanations) {
-                        const ansExplanation = "Wyjaśnienie: " + removeDiacritics(ans.explanation);
-                        doc.fontSize(10)
-                            .fillColor('gray')
-                            .text(ansExplanation, { indent: 40 });
-                        doc.fillColor('black');
-                    }
-                });
-
-                // Dodajemy odstęp między pytaniami
-                doc.moveDown();
             }
 
-            // Kończymy pisanie dokumentu
-            doc.end();
+            if (q.explanation && pdfContent.options.includeExplanations) {
+                const explanationText = "Wyjaśnienie: " + removeDiacritics(q.explanation);
+                doc.fontSize(12).fillColor('gray').text(explanationText, { indent: 20 });
+                doc.fillColor('black');
+            }
 
-            // Czekamy, aż zapis się zakończy
-            await new Promise((resolve, reject) => {
-                writeStream.on('finish', resolve);
-                writeStream.on('error', reject);
+            q.answers.forEach((ans, i) => {
+                const answerPrefix = String.fromCharCode(65 + i) + ". ";
+                let answerText = answerPrefix + removeDiacritics(ans.text);
+
+                if (pdfContent.options.includeCorrectAnswers && ans.correct) {
+                    answerText += " (poprawna)";
+                }
+                doc.fontSize(12).text(answerText, { indent: 20 });
+
+                if (ans.explanation && pdfContent.options.includeExplanations) {
+                    const ansExplanation = "Wyjaśnienie: " + removeDiacritics(ans.explanation);
+                    doc.fontSize(10).fillColor('gray').text(ansExplanation, { indent: 40 });
+                    doc.fillColor('black');
+                }
             });
 
-            console.log('PDF wygenerowany w:', savePath);
-            return { success: true, filePath: savePath };
-        } catch (error) {
-            console.error("Error generating PDF:", error);
-            return { success: false, error: error.message };
+            doc.moveDown(); // Space between questions
         }
-    });
 
+        doc.end();
+
+        await new Promise((resolve, reject) => {
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+        });
+
+        console.log('PDF wygenerowany w:', savePath);
+        return { success: true, filePath: savePath };
+    } catch (error) {
+        console.error("Error generating PDF:", error);
+        return { success: false, error: error.message };
+    }
+});
     function copyFile({ sourcePath, targetPath }) {
         try {
             const src = path.resolve(sourcePath.toString());  // Konwersja na string

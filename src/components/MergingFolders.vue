@@ -103,100 +103,64 @@
                 if (!canMerge.value) return;
                 mergeStatus.value = "Rozpoczynanie scalania...";
 
-                // Zapisz nazwę testu
-                try {
-                    const sanitizedTestName = sanitize(testName.value);
-                    const result = await window.electronAPI.saveFile({
-                        folder: targetFolder.value,
-                        fileName: "testname.txt",
-                        fileContent: sanitizedTestName,
-                    });
-                    if (!result.success) {
-                        mergeStatus.value = "Błąd przy zapisie pliku testname.txt.";
-                        return;
-                    }
-                } catch (error) {
-                    console.error("Błąd przy zapisie testname.txt:", error);
-                    mergeStatus.value = "Błąd przy zapisie testname.txt.";
-                    return;
-                }
-
                 let mergedFilesCount = 0;
-                const duplicateCount = {};
                 const existingFiles = new Set();
-
-                // Sprawdź istniejące pliki w folderze docelowym
-                try {
-                    const result = await window.electronAPI.listFiles(targetFolder.value);
-                    if (result.success) {
-                        result.files.forEach(file => existingFiles.add(file.toLowerCase()));
-                    }
-                } catch (error) {
-                    console.error("Błąd odczytu folderu docelowego:", error);
-                }
 
                 for (const source of sourceFolders.value) {
                     try {
                         const result = await window.electronAPI.listFiles(source);
                         if (result.success) {
-                            const files = result.files.filter(
-                                (file) =>
-                                    (file.endsWith(".txt") && file.toLowerCase() !== "testname.txt") ||
-                                    file.endsWith(".png") ||
-                                    file.endsWith(".jpg") ||
-                                    file.endsWith(".jpeg")
-                            );
+                            for (const file of result.files) {
+                                const ext = getFileExtension(file);
+                                const baseName = getFileNameWithoutExtension(file);
 
-                            for (const file of files) {
-                                const readResult = await window.electronAPI.readFile({
-                                    folder: source,
-                                    fileName: file,
-                                });
-
-                                if (!readResult.success) {
-                                    console.warn(`Nie udało się odczytać pliku ${file} z folderu ${source}`);
-                                    continue;
+                                if (!["txt", "png", "jpg", "jpeg"].includes(ext.toLowerCase())) {
+                                    continue; // Skip unsupported file types
                                 }
 
-                                const fileExtension = getFileExtension(file); // Użyj nowej funkcji
-                                let baseName = getFileNameWithoutExtension(file); // Użyj nowej funkcji
-
-                                // Generuj unikalną nazwę pliku
                                 let newFileName = file;
                                 let version = 1;
 
                                 while (existingFiles.has(newFileName.toLowerCase())) {
                                     version++;
-                                    newFileName = `${baseName}_v${version}${fileExtension}`;
-
-                                    if (!duplicateCount[baseName]) {
-                                        duplicateCount[baseName] = 1;
-                                    } else {
-                                        duplicateCount[baseName]++;
-                                    }
+                                    newFileName = `${baseName}_v${version}.${ext}`;
                                 }
-
                                 existingFiles.add(newFileName.toLowerCase());
 
+                                // Read file content (binary mode for images)
+                                const isBinary = ["png", "jpg", "jpeg"].includes(ext.toLowerCase());
+                                const readResult = await window.electronAPI.readFile({
+                                    folder: source,
+                                    fileName: file,
+                                    isBinary: isBinary,
+                                });
+
+                                if (!readResult.success) {
+                                    console.warn(`Nie udało się odczytać pliku ${file}`);
+                                    continue;
+                                }
+
+                                // Save the file
                                 const saveResult = await window.electronAPI.saveFile({
                                     folder: targetFolder.value,
                                     fileName: newFileName,
                                     fileContent: readResult.content,
+                                    isBinary: isBinary, // Ensure binary images remain binary
                                 });
 
                                 if (saveResult.success) {
                                     mergedFilesCount++;
                                 } else {
-                                    console.warn(`Nie udało się zapisać pliku ${newFileName} w folderze docelowym`);
+                                    console.warn(`Nie udało się zapisać pliku ${newFileName}`);
                                 }
                             }
-                        } else {
-                            console.warn(`Nie udało się wczytać plików z folderu ${source}`);
                         }
                     } catch (error) {
-                        console.error("Błąd podczas scalania folderu:", source, error);
+                        console.error("Błąd scalania folderu:", source, error);
                     }
                 }
+
+
 
                 mergeStatus.value = `Scalanie zakończone. Skopiowano ${mergedFilesCount} plików.`;
                 if (Object.keys(duplicateCount).length > 0) {
