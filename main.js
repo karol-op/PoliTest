@@ -212,7 +212,7 @@ app.whenReady().then(() => {
             }
 
             console.log(`Copying file from: ${src} -> ${dest}`);
-            await fs.copyFile(src, dest); // Use async fs.copyFile
+            await fs.copyFile(src, dest); // Używamy asynchronicznej fs.copyFile
             console.log("File copied!");
             return { success: true };
         } catch (error) {

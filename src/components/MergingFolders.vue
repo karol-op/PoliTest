@@ -1,12 +1,10 @@
 ﻿<template>
     <div class="merging-wrapper">
-        <!-- Nagłówek z przyciskiem powrotu -->
         <header class="merging-header">
             <button @click="goToMainMenu" class="menu-btn">🏠</button>
             <h1 class="page-title">Scalanie folderów z pytaniami</h1>
         </header>
 
-        <!-- Wybór folderów źródłowych -->
         <section class="folder-selection">
             <h2>Wybierz foldery źródłowe</h2>
             <ul>
@@ -18,7 +16,6 @@
             <button @click="addSourceFolder" class="action-btn">Dodaj folder źródłowy</button>
         </section>
 
-        <!-- Wybór folderu docelowego -->
         <section class="target-folder">
             <h2>Wybierz folder docelowy</h2>
             <p v-if="targetFolder" class="selected-folder">
@@ -27,7 +24,6 @@
             <button @click="selectTargetFolder" class="action-btn">Wybierz folder docelowy</button>
         </section>
 
-        <!-- Wybór nazwy testu -->
         <section class="test-name-selection">
             <h2>Nazwa testu</h2>
             <input type="text"
@@ -36,14 +32,12 @@
                    class="text-input" />
         </section>
 
-        <!-- Przycisk scalania -->
         <section class="merge-actions">
             <button @click="mergeFolders" :disabled="!canMerge" class="merge-btn">
                 Scal foldery
             </button>
         </section>
 
-        <!-- Status scalania -->
         <section class="merge-status" v-if="mergeStatus">
             <p>{{ mergeStatus }}</p>
         </section>
@@ -53,22 +47,25 @@
 <script>
     import { ref, computed } from "vue";
     import { useRouter } from "vue-router";
+    import path from 'path';
 
     export default {
         name: "MergingFolders",
         setup() {
+            function getFileExtension(filename) {
+                return filename.slice(((filename.lastIndexOf(".") - 1) >>> 0) + 2);
+            }
+
+            function getFileNameWithoutExtension(filename) {
+                return filename.slice(0, (filename.lastIndexOf(".") >>> 0));
+            }
             const router = useRouter();
 
-            // Foldery źródłowe i docelowy
             const sourceFolders = ref([]);
             const targetFolder = ref(null);
-            // Nazwa testu (dla pliku testname.txt)
             const testName = ref("");
-            // Status scalania (komunikat)
             const mergeStatus = ref("");
 
-            // Możliwość scalania – musi być wybranych co najmniej jeden folder źródłowy,
-            // ustalony folder docelowy oraz wpisana nazwa testu
             const canMerge = computed(
                 () =>
                     sourceFolders.value.length > 0 &&
@@ -76,7 +73,6 @@
                     testName.value.trim() !== ""
             );
 
-            // Dodanie folderu źródłowego
             async function addSourceFolder() {
                 try {
                     const folderPath = await window.electronAPI.selectFolder();
@@ -88,12 +84,10 @@
                 }
             }
 
-            // Usunięcie folderu źródłowego
             function removeSourceFolder(index) {
                 sourceFolders.value.splice(index, 1);
             }
 
-            // Wybór folderu docelowego
             async function selectTargetFolder() {
                 try {
                     const folderPath = await window.electronAPI.selectFolder();
@@ -105,12 +99,11 @@
                 }
             }
 
-            // Scalanie folderów – kopiowanie plików (pomijając testname.txt) oraz zapisywanie nowego testname.txt
             async function mergeFolders() {
                 if (!canMerge.value) return;
                 mergeStatus.value = "Rozpoczynanie scalania...";
 
-                // Zapisz nową nazwę testu w pliku testname.txt w folderze docelowym
+                // Zapisz nazwę testu
                 try {
                     const sanitizedTestName = sanitize(testName.value);
                     const result = await window.electronAPI.saveFile({
@@ -128,56 +121,73 @@
                     return;
                 }
 
-                // Kopiowanie plików z folderów źródłowych
                 let mergedFilesCount = 0;
-                // Obiekt do śledzenia duplikatów – liczba wystąpień danej bazowej nazwy
                 const duplicateCount = {};
+                const existingFiles = new Set();
+
+                // Sprawdź istniejące pliki w folderze docelowym
+                try {
+                    const result = await window.electronAPI.listFiles(targetFolder.value);
+                    if (result.success) {
+                        result.files.forEach(file => existingFiles.add(file.toLowerCase()));
+                    }
+                } catch (error) {
+                    console.error("Błąd odczytu folderu docelowego:", error);
+                }
 
                 for (const source of sourceFolders.value) {
                     try {
                         const result = await window.electronAPI.listFiles(source);
                         if (result.success) {
-                            // Wybieramy pliki .txt, pomijając testname.txt
                             const files = result.files.filter(
                                 (file) =>
-                                    file.endsWith(".txt") &&
-                                    file.toLowerCase() !== "testname.txt"
+                                    (file.endsWith(".txt") && file.toLowerCase() !== "testname.txt") ||
+                                    file.endsWith(".png") ||
+                                    file.endsWith(".jpg") ||
+                                    file.endsWith(".jpeg")
                             );
+
                             for (const file of files) {
                                 const readResult = await window.electronAPI.readFile({
                                     folder: source,
                                     fileName: file,
                                 });
+
                                 if (!readResult.success) {
-                                    console.warn(
-                                        `Nie udało się odczytać pliku ${file} z folderu ${source}`
-                                    );
+                                    console.warn(`Nie udało się odczytać pliku ${file} z folderu ${source}`);
                                     continue;
                                 }
-                                // Ustal bazową nazwę (bez rozszerzenia)
-                                let baseName = file.replace(/\.txt$/i, "");
-                                let newFileName = baseName + ".txt";
 
-                                // Jeśli już wystąpił duplikat, dodajemy sufiks
-                                if (!duplicateCount[baseName]) {
-                                    duplicateCount[baseName] = 0;
-                                } else {
-                                    duplicateCount[baseName]++;
-                                    newFileName = `${baseName}_v${duplicateCount[baseName]}.txt`;
+                                const fileExtension = getFileExtension(file); // Użyj nowej funkcji
+                                let baseName = getFileNameWithoutExtension(file); // Użyj nowej funkcji
+
+                                // Generuj unikalną nazwę pliku
+                                let newFileName = file;
+                                let version = 1;
+
+                                while (existingFiles.has(newFileName.toLowerCase())) {
+                                    version++;
+                                    newFileName = `${baseName}_v${version}${fileExtension}`;
+
+                                    if (!duplicateCount[baseName]) {
+                                        duplicateCount[baseName] = 1;
+                                    } else {
+                                        duplicateCount[baseName]++;
+                                    }
                                 }
 
-                                // Zapisz plik w folderze docelowym
+                                existingFiles.add(newFileName.toLowerCase());
+
                                 const saveResult = await window.electronAPI.saveFile({
                                     folder: targetFolder.value,
                                     fileName: newFileName,
                                     fileContent: readResult.content,
                                 });
+
                                 if (saveResult.success) {
                                     mergedFilesCount++;
                                 } else {
-                                    console.warn(
-                                        `Nie udało się zapisać pliku ${newFileName} w folderze docelowym`
-                                    );
+                                    console.warn(`Nie udało się zapisać pliku ${newFileName} w folderze docelowym`);
                                 }
                             }
                         } else {
@@ -187,10 +197,15 @@
                         console.error("Błąd podczas scalania folderu:", source, error);
                     }
                 }
+
                 mergeStatus.value = `Scalanie zakończone. Skopiowano ${mergedFilesCount} plików.`;
+                if (Object.keys(duplicateCount).length > 0) {
+                    mergeStatus.value += ` Znaleziono duplikaty: ${Object.entries(duplicateCount)
+                        .map(([name, count]) => `${name} (${count})`)
+                        .join(", ")}`;
+                }
             }
 
-            // Funkcja sanitizująca tekst – usuwa znaki specjalne, zmienia spacje na podkreślenia, itp.
             function sanitize(text) {
                 return text
                     .normalize("NFD")
@@ -201,7 +216,6 @@
                     .substring(0, 50);
             }
 
-            // Powrót do strony głównej
             function goToMainMenu() {
                 router.push("/");
             }
@@ -224,7 +238,6 @@
 </script>
 
 <style scoped>
-    /* Stylizacja zgodna z referencyjnymi stylami z quizu */
     .merging-wrapper {
         max-width: 800px;
         margin: 2rem auto;
