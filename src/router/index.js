@@ -5,6 +5,7 @@ import HomePage from '../components/HomePage.vue';
 import CreateTest from '../components/CreateTestPage.vue';
 import CreateQuestions from '../components/CreateQuestionsPage.vue';
 import TestQuiz from '../components/TestQuiz.vue';
+import MergingFolders from '../components/MergingFolders.vue';
 const routes = [
     // Landing page z EmptyLayout
     {
@@ -14,15 +15,14 @@ const routes = [
             {
                 path: '',
                 name: 'home',
-                component: HomePage // Strona docelowa bez nawigacji
+                component: HomePage 
             }
         ]
     },
 
-    // Wszystkie inne strony z MainLayout
     {
         path: '/',
-        component: MainLayout, // Główny layout z nawigacją
+        component: MainLayout, 
         children: [
             {
                 path: 'createtest',
@@ -41,8 +41,12 @@ const routes = [
                 path: 'testquiz',
                 name: 'testquiz',
                 component: TestQuiz
+            },
+            {
+                path: 'mergingfolders',
+                name: 'mergingfolders',
+                component: MergingFolders
             }
-            // Dodaj inne podstrony tutaj
         ]
     }
 ];

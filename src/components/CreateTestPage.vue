@@ -17,6 +17,9 @@
                 <RouterLink to="/" class="back-btn">
                     Wróć
                 </RouterLink>
+                <RouterLink to="mergingfolders" class="merging-btn">
+                    Scal foldery
+                </RouterLink>
             </div>
         </form>
     </div>
@@ -36,15 +39,14 @@
                     router.push({
                         name: 'createquestions',
                         query: { testName: testName.value }
-                    })
+                    });
                 }
-            }
+            };
 
-            return { router, testName, handleSubmit }
+            return { router, testName, handleSubmit };
         }
-    }
+    };
 </script>
-
 
 <style scoped>
     .create-test-page {
@@ -124,5 +126,23 @@
             background: linear-gradient(135deg, #777, #555);
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(102, 102, 102, 0.3);
+        }
+
+    .merging-btn {
+        background: linear-gradient(135deg, #4a90e2, #357ab8);
+        color: white;
+        padding: 0.75rem 1.5rem; /* zmniejszony padding */
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem; /* zmniejszony rozmiar czcionki */
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+        .merging-btn:hover {
+            background: linear-gradient(135deg, #5aa1f2, #4690c8);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
         }
 </style>

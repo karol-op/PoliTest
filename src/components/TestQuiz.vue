@@ -535,10 +535,11 @@
                 }
                 // beforeunload – ustawienie e.returnValue wyświetli natywny komunikat przeglądarki
                 window.addEventListener("beforeunload", (e) => {
-                    if (!progressSaved.value && (history.value.length > 0 || pendingQuestions.value.length > 0)) {
+                    if (!progressSaved.value && (history.value.length > 0 || selectedAnswers.value.length > 0)) {
                         e.returnValue = "Masz niezapisany postęp testu. Czy chcesz zapisać postęp?";
                     }
                 });
+
             });
 
             return {
