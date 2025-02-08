@@ -1,6 +1,8 @@
 ﻿const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
+const { autoUpdater } = require("electron-updater");
+
 let mainWindow;
 app.whenReady().then(() => {
   mainWindow = new BrowserWindow({
@@ -296,8 +298,36 @@ app.whenReady().then(() => {
     mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
   }
 
-  Menu.setApplicationMenu(null);
+    Menu.setApplicationMenu(null);
+    checkForUpdates();
+    function checkForUpdates() {
+        autoUpdater.checkForUpdatesAndNotify();
+    }
 
+    autoUpdater.on("update-available", () => {
+        const response = dialog.showMessageBoxSync(mainWindow, {
+            type: "info",
+            title: "Nowa aktualizacja dostępna",
+            message: "Dostępna jest nowa wersja aplikacji. Czy chcesz ją pobrać?",
+            buttons: ["Tak", "Nie"],
+        });
+
+        if (response === 0) {
+            autoUpdater.downloadUpdate();
+        }
+    });
+
+    autoUpdater.on("update-downloaded", () => {
+        const response = dialog.showMessageBoxSync(mainWindow, {
+            type: "info",
+            title: "Aktualizacja pobrana",
+            message: "Aplikacja zostanie teraz zaktualizowana i uruchomiona ponownie.",
+            buttons: ["Zainstaluj teraz"],
+        });
+
+        if (response === 0) {
+            autoUpdater.quitAndInstall();
+        }
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
       app.quit();
