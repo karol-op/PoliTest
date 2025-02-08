@@ -23,30 +23,28 @@
 </template>
 
 <script>
+    import { ref } from 'vue'
     import { useRouter } from 'vue-router'
 
     export default {
         setup() {
-            const router = useRouter()
-            return { router }
-        },
-        data() {
-            return {
-                testName: ''
-            }
-        },
-        methods: {
-            handleSubmit() {
-                if (this.testName.trim()) {
-                    this.router.push({
+            const router = useRouter();
+            const testName = ref('');
+
+            const handleSubmit = () => {
+                if (testName.value.trim()) {
+                    router.push({
                         name: 'createquestions',
-                        query: { testName: this.testName }
+                        query: { testName: testName.value }
                     })
                 }
             }
+
+            return { router, testName, handleSubmit }
         }
     }
 </script>
+
 
 <style scoped>
     .create-test-page {
@@ -78,14 +76,14 @@
         transition: all 0.3s ease;
     }
 
-    .test-name-input:focus {
-        border-color: #36a174;
-        box-shadow: 0 0 8px rgba(66, 185, 131, 0.3);
-    }
+        .test-name-input:focus {
+            border-color: #36a174;
+            box-shadow: 0 0 8px rgba(66, 185, 131, 0.3);
+        }
 
-    .test-name-input::placeholder {
-        color: #888;
-    }
+        .test-name-input::placeholder {
+            color: #888;
+        }
 
     .button-group {
         display: flex;
@@ -105,10 +103,10 @@
         transition: all 0.3s ease;
     }
 
-    .submit-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(66, 185, 131, 0.3);
-    }
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(66, 185, 131, 0.3);
+        }
 
     .back-btn {
         background: linear-gradient(135deg, #666, #444);
@@ -122,9 +120,9 @@
         transition: all 0.3s ease;
     }
 
-    .back-btn:hover {
-        background: linear-gradient(135deg, #777, #555);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(102, 102, 102, 0.3);
-    }
+        .back-btn:hover {
+            background: linear-gradient(135deg, #777, #555);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 102, 102, 0.3);
+        }
 </style>
