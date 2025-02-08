@@ -36,7 +36,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.exe
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GH_TOKEN }}  # Upewnij się, że GH_TOKEN jest ustawiony jako sekret
           tag_name: ${{ github.ref_name }}
           draft: false
           prerelease: false
