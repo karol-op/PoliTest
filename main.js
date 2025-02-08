@@ -290,11 +290,9 @@ app.whenReady().then(() => {
     });
 
   if (isDev) {
-      mainWindow.webContents.toggleDevTools();
 
     mainWindow.loadURL('http://localhost:5173'); 
   } else {
-      mainWindow.webContents.toggleDevTools();
     mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
   }
 

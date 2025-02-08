@@ -297,6 +297,12 @@
                     });
                 }
             }
+            // Rejestracja globalnego listenera do skrótu klawiszowego (Ctrl+D)
+            window.addEventListener("keydown", this.handleKeyDown);
+        },
+        beforeDestroy() {
+            // Usunięcie listenera przy niszczeniu komponentu
+            window.removeEventListener("keydown", this.handleKeyDown);
         },
         methods: {
             sanitize(text) {
@@ -634,6 +640,13 @@
                     this.notification = null;
                 }, 3000);
             },
+            // Nowa metoda obsługująca skrót klawiszowy Ctrl+D
+            handleKeyDown(event) {
+                if (event.ctrlKey && event.key.toLowerCase() === "d") {
+                    event.preventDefault();
+                    this.addAnswer();
+                }
+            }
         },
     };
 </script>
