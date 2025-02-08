@@ -2,7 +2,7 @@
     <div class="quiz-wrapper">
         <!-- Główna część quizu -->
         <div class="quiz-page">
-            <!-- Nagłówek: przyciski powrotu, wyśrodkowana nazwa quizu i przycisk ustawień -->
+            <!-- Nagłówek -->
             <header class="quiz-header">
                 <button @click="goToMainMenu" class="menu-btn">🏠</button>
                 <h1 class="test-name">{{ testName }}</h1>
@@ -31,7 +31,6 @@
                         <span v-else>{{ history.length + 1 }}</span>
                         z {{ history.length + pendingQuestions.length }}
                     </p>
-                    <!-- Nagłówek pytania -->
                     <div class="question-header">
                         <h2 class="question-text">{{ displayedQuestion.question }}</h2>
                         <button v-if="displayedQuestion.explanation"
@@ -52,14 +51,10 @@
                         <li v-for="(answer, index) in displayedQuestion.answers" :key="index" class="answer-item">
                             <div class="answer-wrapper">
                                 <button @click="selectAnswer(answer)"
-                                        :class="[
-                          isSelected(answer) ? 'selected' : '',
-                          {
-                            correct: inReviewMode && isSelected(answer) && answer.correct,
-                            missed: inReviewMode && !isSelected(answer) && answer.correct,
-                            incorrect: inReviewMode && isSelected(answer) && !answer.correct
-                          }
-                        ]"
+                                        :class="[ isSelected(answer) ? 'selected' : '',
+                                  { correct: inReviewMode && isSelected(answer) && answer.correct,
+                                    missed: inReviewMode && !isSelected(answer) && answer.correct,
+                                    incorrect: inReviewMode && isSelected(answer) && !answer.correct } ]"
                                         :disabled="inReviewMode"
                                         class="answer-btn">
                                     {{ answer.text }}
@@ -107,6 +102,7 @@
             </div>
             <p>Czas:</p>
             <p>{{ formattedTime }}</p>
+            <button @click="saveProgress" class="save-progress-btn">Zapisz postęp</button>
         </div>
 
         <!-- Popup ustawień -->
@@ -138,7 +134,7 @@
 </template>
 
 <script>
-    import { ref, computed, onMounted } from 'vue';
+    import { ref, computed, onMounted, watch } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
 
     export default {
@@ -172,28 +168,25 @@
             const elapsedTime = ref(0);
             let timerInterval = null;
 
-            // currentDisplayIndex: gdy mniejszy niż długość historii – przeglądamy już odpowiedziane pytanie;
-            // gdy równy długości historii – wyświetlamy bieżące (nieodpowiedziane) pytanie.
+            // Flaga, czy postęp został zapisany
+            const progressSaved = ref(false);
+
+            // currentDisplayIndex: jeśli mniejszy niż długość historii – przeglądamy już odpowiedziane pytanie;
+            // jeśli równy długości historii – wyświetlamy bieżące pytanie.
             const currentDisplayIndex = ref(0);
             const inReviewMode = computed(() => currentDisplayIndex.value < history.value.length);
 
             // Pytanie wyświetlane zależy od trybu
-            const displayedQuestion = computed(() => {
-                if (inReviewMode.value) {
-                    return history.value[currentDisplayIndex.value].question;
-                } else {
-                    return pendingQuestions.value[0] || {};
-                }
-            });
+            const displayedQuestion = computed(() =>
+                inReviewMode.value ? history.value[currentDisplayIndex.value].question
+                    : pendingQuestions.value[0] || {}
+            );
 
-            // Wybrane odpowiedzi wyświetlane (dla bieżącego lub z historii)
-            const displayedSelectedAnswers = computed(() => {
-                if (inReviewMode.value) {
-                    return history.value[currentDisplayIndex.value].selected;
-                } else {
-                    return selectedAnswers.value;
-                }
-            });
+            // Wybrane odpowiedzi – z historii lub bieżące
+            const displayedSelectedAnswers = computed(() =>
+                inReviewMode.value ? history.value[currentDisplayIndex.value].selected
+                    : selectedAnswers.value
+            );
 
             const score = computed(() => history.value.filter(entry => entry.correct).length);
             const answeredPercentage = computed(() =>
@@ -222,10 +215,10 @@
                 explanationPopupVisible.value = false;
             };
 
-            // Mapa powtórzeń
+            // Mapa powtórzeń – po wczytaniu stanu będziemy ją przebudowywać
             const maxDuplicateMap = ref({});
 
-            // Obliczanie opanowanych pytań
+            // Obliczanie opanowanych pytań – przyjmujemy, że klucz to: "fileName:question"
             const masteredQuestions = computed(() => {
                 let count = 0;
                 for (const key in maxDuplicateMap.value) {
@@ -301,7 +294,7 @@
                 }
             };
 
-            // Funkcja parsująca pytanie
+            // Parsowanie pytania
             const parseQuestion = (content, fileName) => {
                 const lines = content.split("\n").map(l => l.trim()).filter(l => l !== "");
                 if (lines.length < 2) return null;
@@ -344,7 +337,7 @@
                 return { question: questionText, explanation: questionExplanation, image, answers, fileName };
             };
 
-            // Funkcja mieszająca tablicę
+            // Mieszanie tablicy
             const shuffleArray = (array) => {
                 const newArray = array.slice();
                 for (let i = newArray.length - 1; i > 0; i--) {
@@ -363,13 +356,14 @@
                 } else {
                     selectedAnswers.value.push(answer);
                 }
+                progressSaved.value = false;
             };
 
             const isSelected = (answer) => {
                 return displayedSelectedAnswers.value.includes(answer);
             };
 
-            // Zatwierdzanie odpowiedzi bieżącego pytania
+            // Zatwierdzanie bieżącej odpowiedzi
             const confirmAnswers = () => {
                 if (selectedAnswers.value.length === 0) return;
                 if (!startTime.value) {
@@ -406,8 +400,8 @@
                 }
                 pendingQuestions.value.shift();
                 selectedAnswers.value = [];
-                // Po zatwierdzeniu ustawiamy widok na ostatnio odpowiedziane pytanie
                 currentDisplayIndex.value = history.value.length - 1;
+                progressSaved.value = false;
             };
 
             // Nawigacja – cofanie
@@ -423,13 +417,18 @@
                     if (currentDisplayIndex.value < history.value.length - 1) {
                         currentDisplayIndex.value++;
                     } else {
-                        // Nawet jeśli pendingQuestions jest puste, przechodzimy do stanu zakończenia testu
                         currentDisplayIndex.value = history.value.length;
                     }
                 }
             };
 
+            // Przejście do strony głównej – jeśli postęp niezapisany, zapytaj, ale nie blokuj wyjścia
             const goToMainMenu = () => {
+                if (!progressSaved.value && (history.value.length > 0 || pendingQuestions.value.length > 0)) {
+                    if (window.confirm("Masz niezapisany postęp testu. Czy chcesz zapisać postęp przed powrotem do strony głównej?")) {
+                        saveProgress();
+                    }
+                }
                 router.push("/");
             };
 
@@ -443,6 +442,7 @@
                 history.value = [];
                 selectedAnswers.value = [];
                 currentDisplayIndex.value = 0;
+                progressSaved.value = false;
                 loadQuestions();
             };
 
@@ -467,14 +467,78 @@
                 showSettingsPopup.value = false;
             };
 
-            const checkForNameUpdate = () => {
-                // Ewentualna logika aktualizacji nazwy testu
+            // Zapis postępu
+            const saveProgress = () => {
+                const progressData = {
+                    history: history.value,
+                    pendingQuestions: pendingQuestions.value,
+                    currentDisplayIndex: currentDisplayIndex.value,
+                    elapsedTime: elapsedTime.value
+                };
+                localStorage.setItem("quizProgress", JSON.stringify(progressData));
+                progressSaved.value = true;
+                alert("Postęp zapisany!");
             };
 
+            // Ładowanie postępu – po wczytaniu odtwórz stan i przebuduj maxDuplicateMap
+            const loadProgress = (data) => {
+                try {
+                    const progressData = JSON.parse(data);
+                    history.value = progressData.history || [];
+                    pendingQuestions.value = progressData.pendingQuestions || [];
+                    currentDisplayIndex.value = progressData.currentDisplayIndex || 0;
+                    elapsedTime.value = progressData.elapsedTime || 0;
+                    progressSaved.value = true;
+                    // Przebuduj maxDuplicateMap na podstawie historii
+                    maxDuplicateMap.value = {};
+                    history.value.forEach(entry => {
+                        const key = `${entry.question.fileName}:${entry.question.question}`;
+                        if (!maxDuplicateMap.value[key] || entry.question.repeatNumber > maxDuplicateMap.value[key]) {
+                            maxDuplicateMap.value[key] = entry.question.repeatNumber;
+                        }
+                    });
+                    // Ustaw timer, aby kontynuował od zapisanej wartości (elapsedTime w sekundach)
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    startTime.value = Date.now() - (elapsedTime.value * 1000);
+                    timerInterval = setInterval(() => {
+                        elapsedTime.value = Math.floor((Date.now() - startTime.value) / 1000);
+                    }, 1000);
+                } catch (e) {
+                    console.error("Błąd przy wczytywaniu postępu", e);
+                }
+            };
+
+            // Zatrzymywanie timera, gdy quiz się kończy
+            watch(
+                () => (pendingQuestions.value.length === 0 && currentDisplayIndex.value === history.value.length),
+                (finished) => {
+                    if (finished && timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                }
+            );
+
+            // Przy starcie – sprawdź, czy istnieje zapisany postęp
             onMounted(() => {
                 loadQuestions();
-                const interval = setInterval(checkForNameUpdate, 5000);
-                return () => clearInterval(interval);
+                const savedProgress = localStorage.getItem("quizProgress");
+                if (savedProgress) {
+                    if (window.confirm("Wykryto zapisany postęp testu. Czy chcesz go wczytać?")) {
+                        loadProgress(savedProgress);
+                    } else {
+                        localStorage.removeItem("quizProgress");
+                    }
+                }
+                // beforeunload – ustawienie e.returnValue wyświetli natywny komunikat przeglądarki
+                window.addEventListener("beforeunload", (e) => {
+                    if (!progressSaved.value && (history.value.length > 0 || pendingQuestions.value.length > 0)) {
+                        e.returnValue = "Masz niezapisany postęp testu. Czy chcesz zapisać postęp?";
+                    }
+                });
             });
 
             return {
@@ -512,7 +576,8 @@
                 restartQuiz,
                 openSettings,
                 closeSettings,
-                saveSettings
+                saveSettings,
+                saveProgress
             };
         }
     };
@@ -881,4 +946,20 @@
         cursor: pointer;
         font-size: 0.8rem;
     }
+
+    .save-progress-btn {
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background: linear-gradient(135deg, #42b983, #2ecc71);
+        color: #fff;
+        transition: transform 0.2s;
+    }
+
+        .save-progress-btn:hover {
+            transform: translateY(-2px);
+        }
 </style>
