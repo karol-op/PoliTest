@@ -7,5 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFile: (data) => ipcRenderer.invoke('read-file', data),
   selectImage: () => ipcRenderer.invoke('select-image'),
   deleteFile: (data) => ipcRenderer.invoke('delete-file', data),
-  copyFile: (source, destination) => ipcRenderer.invoke('copy-file', { source, destination })
+    copyFile: (source, destination) => ipcRenderer.invoke('copy-file', { source, destination }),
+    showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
+    exportPDF: (options) => ipcRenderer.invoke('export-pdf', options)
+
 });
