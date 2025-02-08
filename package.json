@@ -10,6 +10,7 @@
     "electron": "electron ."
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "idb-keyval": "^6.2.1",
     "image-size": "^1.2.0",
     "pdfkit": "^0.16.0",
