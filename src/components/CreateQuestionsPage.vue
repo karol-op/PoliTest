@@ -24,164 +24,147 @@
 
     <!-- Główny formularz -->
     <div class="form-container">
-      <div class="test-name-header">
-        <h1>Tworzenie pytań</h1>
-        <h2 class="test-name">
-          <span v-if="!editingTestName">{{ storedTestName }}</span>
-          <input v-else type="text" v-model="testName" class="test-name-input-inline" />
-          <button @click="toggleEditTestName" class="edit-test-name-btn" title="Edytuj nazwę testu">
-            ✎
-          </button>
-        </h2>
-      </div>
-
-      <!-- Wybór folderu i zdjęcia -->
-      <div class="folder-section">
-        <div v-if="!selectedFolder">
-          <button @click="selectFolder" class="folder-btn">
-            📁 Wybierz lokalizację zapisu
-          </button>
-          <p v-if="folderError" class="error-message">{{ folderError }}</p>
-        </div>
-        <div v-else class="selected-folder-container">
-          <div class="selected-folder-display">
-            <p class="selected-folder">
-              📁 Wybrana lokalizacija: <strong>{{ selectedFolder }}</strong>
-            </p>
-            <button @click="changeFolder" class="reload-button" title="Zmień folder">
-              🔄
-            </button>
-          </div>
-          <div class="image-upload" v-if="!selectedImage">
-            <button type="button" @click="chooseImage" class="image-btn">
-              Dodaj zdjęcie
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Formularz pytania -->
-      <form @submit.prevent="handleSubmit">
-        <!-- Kontener dla pola pytania (relative, by umieścić przycisk wewnątrz) -->
-        <div class="form-group question-group input-container">
-          <textarea
-            v-model.trim="currentQuestion"
-            placeholder="Wpisz swoje pytanie"
-            required
-            rows="3"
-            class="question-input"
-            :class="{ 'input-error': showErrors && !currentQuestion }"
-          ></textarea>
-          <button
-            type="button"
-            class="exp-btn"
-            @click="openExplanationPopup('question')"
-            :class="{'exp-btn-green': questionExplanation.trim(), 'exp-btn-red': !questionExplanation.trim()}"
-            title="Dodaj/edytuj wyjaśnienie"
-          >
-            ?
-          </button>
-          <span v-if="showErrors && !currentQuestion" class="error-message">
-            Pytanie jest wymagane
-          </span>
+        <div class="test-name-header">
+            <h1>Tworzenie pytań</h1>
+            <h2 class="test-name" @click="toggleEditTestName">
+                <span v-if="!editingTestName">{{ storedTestName }}</span>
+                <input v-else type="text" v-model="testName" class="test-name-input-inline" />
+            </h2>
         </div>
 
-        <!-- Podgląd zdjęcia -->
-        <div v-if="selectedImage" class="image-preview-section">
-          <span class="image-name">
-            Wybrano: {{ imageFileName }}
-          </span>
-          <div class="image-preview">
-            <img :src="selectedImage" alt="Podgląd zdjęcia" />
-            <!-- Kontener przycisków zdjęcia -->
-            <div class="image-actions">
-              <button type="button" @click="chooseImage" class="modify-image-btn" title="Zmień zdjęcie">
-                🔄
-              </button>
-              <button type="button" @click="removeImage" class="remove-btn image-remove-btn" title="Usuń zdjęcie">
-                🗑
-              </button>
+
+        <!-- Wybór folderu i zdjęcia -->
+        <div class="folder-section">
+            <div v-if="!selectedFolder">
+                <button @click="selectFolder" class="folder-btn">
+                    📁 Wybierz lokalizację zapisu
+                </button>
+                <p v-if="folderError" class="error-message">{{ folderError }}</p>
             </div>
-          </div>
-        </div>
-
-        <!-- Sekcja odpowiedzi -->
-        <div class="answers-section">
-          <h3>Odpowiedzi:</h3>
-          <div
-            v-for="(answer, index) in answers"
-            :key="index"
-            class="answer-item"
-          >
-            <!-- Kontener inputa z przyciskiem explanation -->
-            <div class="answer-input-container">
-              <input
-                type="text"
-                v-model.trim="answer.text"
-                placeholder="Wpisz odpowiedź"
-                class="answer-input"
-                :class="{ 'input-error': showErrors && !answer.text }"
-                @input="clearAddError"
-              />
-              <button
-                type="button"
-                class="exp-btn"
-                @click="openExplanationPopup('answer', index)"
-                :class="{'exp-btn-green': answer.explanation.trim(), 'exp-btn-red': !answer.explanation.trim()}"
-                title="Dodaj/edytuj wyjaśnienie"
-              >
-                ?
-              </button>
+            <div v-else class="selected-folder-container">
+                <div class="selected-folder-display">
+                    <p class="selected-folder">
+                        📁 Wybrana lokalizacija: <strong>{{ selectedFolder }}</strong>
+                    </p>
+                    <button @click="changeFolder" class="reload-button" title="Zmień folder">
+                        🔄
+                    </button>
+                </div>
+                <div class="image-upload" v-if="!selectedImage">
+                    <button type="button" @click="chooseImage" class="image-btn">
+                        Dodaj zdjęcie
+                    </button>
+                </div>
             </div>
-            <label class="correct-label">
-              <input
-                type="checkbox"
-                v-model="answer.isCorrect"
-                class="correct-checkbox"
-              />
-              Poprawna
-            </label>
-            <!-- Przycisk usuwania odpowiedzi -->
-            <button
-              v-if="answers.length > 1"
-              @click="confirmRemove(index)"
-              class="remove-btn"
-              type="button"
-              title="Usuń odpowiedź"
-            >
-              🗑
-            </button>
-          </div>
-          <div v-if="addAnswerError" class="error-message">
-            {{ addAnswerError }}
-          </div>
         </div>
 
-        <!-- Walidacja -->
-        <div v-if="showErrors && !hasCorrectAnswer" class="error-message">
-          Przynajmniej jedna odpowiedź musi być oznaczona jako poprawna
-        </div>
+        <!-- Formularz pytania -->
+        <form @submit.prevent="handleSubmit">
+            <!-- Kontener dla pola pytania (relative, by umieścić przycisk wewnątrz) -->
+            <div class="form-group question-group input-container">
+<textarea v-model.trim="currentQuestion"
+          placeholder="Wpisz swoje pytanie"
+          required
+          rows="3"
+          class="question-input"
+          :class="{ 'input-error': showErrors && !currentQuestion }"></textarea>
 
-        <!-- Przyciski akcji -->
-        <div class="button-group">
-          <div class="action-buttons">
-            <button
-              type="button"
-              @click="addAnswer"
-              class="add-answer-btn"
-              :disabled="addAnswerPending"
-            >
-              ➕ Dodaj odpowiedź
-            </button>
-            <button type="submit" class="submit-btn">
-              💾 Zapisz pytanie
-            </button>
-          </div>
-          <button type="button" @click="goBack" class="back-btn">
-            ← Wróć
-          </button>
-        </div>
-      </form>
+                <button type="button"
+                        class="exp-btn"
+                        @click="openExplanationPopup('question')"
+                        :class="{'exp-btn-green': questionExplanation.trim(), 'exp-btn-red': !questionExplanation.trim()}"
+                        title="Dodaj/edytuj wyjaśnienie">
+                    ?
+                </button>
+                <span v-if="showErrors && !currentQuestion" class="error-message">
+                    Pytanie jest wymagane
+                </span>
+            </div>
+
+            <!-- Podgląd zdjęcia -->
+            <div v-if="selectedImage" class="image-preview-section">
+                <span class="image-name">
+                    Wybrano: {{ imageFileName }}
+                </span>
+                <div class="image-preview">
+                    <img :src="selectedImage" alt="Podgląd zdjęcia" />
+                    <!-- Kontener przycisków zdjęcia -->
+                    <div class="image-actions">
+                        <button type="button" @click="chooseImage" class="modify-image-btn" title="Zmień zdjęcie">
+                            🔄
+                        </button>
+                        <button type="button" @click="removeImage" class="remove-btn image-remove-btn" title="Usuń zdjęcie">
+                            🗑
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sekcja odpowiedzi -->
+            <div class="answers-section">
+                <h3>Odpowiedzi:</h3>
+                <div v-for="(answer, index) in answers"
+                     :key="index"
+                     class="answer-item">
+                    <!-- Kontener inputa z przyciskiem explanation -->
+                    <div class="answer-input-container">
+                        <input type="text"
+                               v-model.trim="answer.text"
+                               placeholder="Wpisz odpowiedź"
+                               class="answer-input"
+                               :class="{ 'input-error': showErrors && !answer.text }"
+                               @input="clearAddError" />
+                        <button type="button"
+                                class="exp-btn"
+                                @click="openExplanationPopup('answer', index)"
+                                :class="{'exp-btn-green': answer.explanation.trim(), 'exp-btn-red': !answer.explanation.trim()}"
+                                title="Dodaj/edytuj wyjaśnienie">
+                            ?
+                        </button>
+                    </div>
+                    <label class="correct-label">
+                        <input type="checkbox"
+                               v-model="answer.isCorrect"
+                               class="correct-checkbox" />
+                        Poprawna
+                    </label>
+                    <!-- Przycisk usuwania odpowiedzi -->
+                    <button v-if="answers.length > 1"
+                            @click="confirmRemove(index)"
+                            class="remove-btn"
+                            type="button"
+                            title="Usuń odpowiedź">
+                        🗑
+                    </button>
+                </div>
+                <div v-if="addAnswerError" class="error-message">
+                    {{ addAnswerError }}
+                </div>
+            </div>
+
+            <!-- Walidacja -->
+            <div v-if="showErrors && !hasCorrectAnswer" class="error-message">
+                Przynajmniej jedna odpowiedź musi być oznaczona jako poprawna
+            </div>
+
+            <!-- Przyciski akcji -->
+            <div class="button-group">
+                <div class="action-buttons">
+                    <button type="button"
+                            @click="addAnswer"
+                            class="add-answer-btn"
+                            :disabled="addAnswerPending">
+                        ➕ Dodaj odpowiedź
+                    </button>
+                    <button type="submit" class="submit-btn">
+                        💾 Zapisz pytanie
+                    </button>
+                </div>
+                <button type="button" @click="goBack" class="back-btn">
+                    ← Wróć
+                </button>
+            </div>
+        </form>
     </div>
 
     <!-- Popup do edycji wyjaśnień -->
@@ -689,18 +672,19 @@ export default {
   width: 300px;
   text-align: center;
 }
-.explanation-popup textarea {
-  width: 100%;
-  height: 80px;
-  margin: 0.5rem 0;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-.popup-actions {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 0.5rem;
-}
+    .explanation-popup textarea {
+        width: 100%;
+        height: 80px;
+        margin: 0.5rem 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .popup-actions {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        margin-top: 0.5rem;
+    }
 .popup-save-btn,
 .popup-cancel-btn {
   padding: 0.5rem 1rem;
@@ -730,21 +714,20 @@ export default {
   justify-content: center;
 }
 
-.back-btn {
-  width: 100%;
-  padding: 0.8rem 1.5rem;
-  background: linear-gradient(135deg, #666, #444);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
+    .back-btn {
+        padding: 0.8rem 1.5rem;
+        background: linear-gradient(135deg, #666, #444);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
 
-.back-btn:hover {
-  transform: scale(1.05);
-  background: linear-gradient(135deg, #777, #555);
-}
+        .back-btn:hover {
+            transform: scale(1.05);
+            background: linear-gradient(135deg, #777, #555);
+        }
 
 .questions-page {
   display: flex;
@@ -881,6 +864,7 @@ export default {
   align-items: center;
   justify-content: center;
   gap: 5px;
+  cursor: pointer;
 }
 
 .test-name-input-inline {
