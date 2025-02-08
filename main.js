@@ -83,90 +83,147 @@ app.whenReady().then(() => {
         const result = await dialog.showSaveDialog(options);
         return result;
     });
-ipcMain.handle('export-pdf', async (event, options) => {
-    console.log('Eksportowanie PDF z opcjami:', options);
+    ipcMain.handle('export-pdf', async (event, options) => {
+        console.log('Eksportowanie PDF z opcjami:', options);
 
-    const PDFDocument = require('pdfkit');
-    const fs = require('fs');
-    const { pdfContent, savePath } = options;
+        const PDFDocument = require('pdfkit');
+        const fs = require('fs');
+        const sizeOf = require('image-size'); // Dodaj ten pakiet
 
-    const removeDiacritics = (str) => {
-        if (!str) return '';
-        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    };
+        try {
+            const { pdfContent, savePath } = options;
+            const doc = new PDFDocument();
+            const writeStream = fs.createWriteStream(savePath);
+            doc.pipe(writeStream);
 
-    try {
-        const doc = new PDFDocument();
-        const writeStream = fs.createWriteStream(savePath);
-        doc.pipe(writeStream);
+            // Funkcja do usuwania diakrytyków
+            const removeDiacritics = (str) => {
+                if (!str) return '';
+                return str
+                    .normalize("NFD") // Rozbija znaki na podstawowe litery i znaki diakrytyczne
+                    .replace(/[\u0300-\u036f]/g, "") // Usuwa znaki diakrytyczne
+                    .replace(/ł/g, 'l') // Zamienia polskie "ł" na "l"
+                    .replace(/Ł/g, 'L'); // Zamienia polskie "Ł" na "L"
+            };
 
-        const title = removeDiacritics(pdfContent.testName);
-        doc.fontSize(20).text(title, { align: 'center' });
-        doc.moveDown();
+            // Nagłówek
+            doc.fontSize(20)
+                .text(removeDiacritics(pdfContent.testName), { align: 'center' })
+                .moveDown(2);
 
-        for (const q of pdfContent.questions) {
-            const questionText = `${pdfContent.questions.indexOf(q) + 1}. ${removeDiacritics(q.question)}`;
-            doc.fontSize(14).text(questionText);
+            // Przestrzeń robocza
+            const margin = 50;
+            const pageWidth = doc.page.width - 2 * margin;
+            let verticalPosition = doc.y;
 
-            if (q.image) {
-                try {
-                    // Get image dimensions to calculate scaling
-                    const imageStats = fs.statSync(q.image);
-                    const image = doc.image(q.image, {
-                        fit: [400, 250], // Maintain aspect ratio, fit within bounds
-                        align: 'center',
-                        // Add below line to avoid overlapping
-                        // moveDown: 1 // Add some space after the image
-                    });
-                    doc.moveDown(1); // Add some space after the image
-                    // or
-                    // doc.moveDown(image.height + 10); // Add space based on image height + margin
-                } catch (imageError) {
-                    console.error('Błąd podczas wstawiania obrazu:', imageError);
-                    doc.fontSize(12).fillColor('red').text("Błąd: Nie można załadować obrazu.", { align: 'center' });
-                    doc.fillColor('black'); // Reset color
+            pdfContent.questions.forEach((q, index) => {
+                // Numer pytania
+                const questionNumber = `${index + 1}. `;
+                const questionText = removeDiacritics(q.question);
+
+                // Oblicz wysokość tekstu pytania
+                const questionHeight = doc.heightOfString(questionNumber + questionText, {
+                    width: pageWidth
+                });
+
+                // Sprawdź miejsce na stronie
+                if (verticalPosition + questionHeight > doc.page.height - margin) {
+                    doc.addPage();
+                    verticalPosition = margin;
                 }
-            }
 
-            if (q.explanation && pdfContent.options.includeExplanations) {
-                const explanationText = "Wyjaśnienie: " + removeDiacritics(q.explanation);
-                doc.fontSize(12).fillColor('gray').text(explanationText, { indent: 20 });
-                doc.fillColor('black');
-            }
+                // Dodaj pytanie
+                doc.fontSize(14)
+                    .text(questionNumber + questionText, { paragraphGap: 10 })
+                    .moveDown(0.5);
 
-            q.answers.forEach((ans, i) => {
-                const answerPrefix = String.fromCharCode(65 + i) + ". ";
-                let answerText = answerPrefix + removeDiacritics(ans.text);
+                verticalPosition = doc.y;
 
-                if (pdfContent.options.includeCorrectAnswers && ans.correct) {
-                    answerText += " (poprawna)";
+                // Obsługa obrazu
+                if (q.image) {
+                    try {
+                        // Wymiary obrazu
+                        const dimensions = sizeOf(q.image);
+                        const maxWidth = 400;
+                        const ratio = maxWidth / dimensions.width;
+                        const scaledHeight = dimensions.height * ratio;
+
+                        // Sprawdź miejsce na obraz
+                        if (verticalPosition + scaledHeight > doc.page.height - margin) {
+                            doc.addPage();
+                            verticalPosition = margin;
+                        }
+
+                        // Dodaj obraz
+                        doc.image(q.image, {
+                            width: maxWidth,
+                            align: 'center'
+                        });
+
+                        // Aktualizuj pozycję i dodaj odstęp
+                        verticalPosition += scaledHeight + 20;
+                        doc.y = verticalPosition;
+                        doc.moveDown(1);
+
+                    } catch (imageError) {
+                        console.error('Błąd obrazu:', imageError);
+                        doc.fontSize(12)
+                            .fillColor('red')
+                            .text('[BŁĄD OBRAZU]', { align: 'center' })
+                            .fillColor('black');
+                    }
                 }
-                doc.fontSize(12).text(answerText, { indent: 20 });
 
-                if (ans.explanation && pdfContent.options.includeExplanations) {
-                    const ansExplanation = "Wyjaśnienie: " + removeDiacritics(ans.explanation);
-                    doc.fontSize(10).fillColor('gray').text(ansExplanation, { indent: 40 });
-                    doc.fillColor('black');
+                // Wyjaśnienie pytania
+                if (q.explanation && pdfContent.options.includeExplanations) {
+                    const explanationText = "Wyjasnienie: " + removeDiacritics(q.explanation);
+                    doc.fontSize(12)
+                        .fillColor('#666')
+                        .text(explanationText, { indent: 20 })
+                        .moveDown(0.5);
                 }
+
+                // Odpowiedzi
+                q.answers.forEach((ans, i) => {
+                    const prefix = `${String.fromCharCode(65 + i)}. `;
+                    let answerText = prefix + removeDiacritics(ans.text);
+
+                    if (pdfContent.options.includeCorrectAnswers && ans.correct) {
+                        answerText += " (poprawna)";
+                    }
+
+                    doc.fontSize(12)
+                        .fillColor('black')
+                        .text(answerText, { indent: 20 })
+                        .moveDown(0.3);
+
+                    // Wyjaśnienie odpowiedzi
+                    if (ans.explanation && pdfContent.options.includeExplanations) {
+                        doc.fontSize(10)
+                            .fillColor('#999')
+                            .text(`Wyjasnienie: ${removeDiacritics(ans.explanation)}`,
+                                { indent: 40 })
+                            .moveDown(0.2);
+                    }
+                });
+
+                doc.moveDown(1);
+                verticalPosition = doc.y;
             });
 
-            doc.moveDown(); // Space between questions
+            doc.end();
+
+            await new Promise((resolve, reject) => {
+                writeStream.on('finish', resolve);
+                writeStream.on('error', reject);
+            });
+
+            return { success: true, filePath: savePath };
+        } catch (error) {
+            console.error("Błąd generowania PDF:", error);
+            return { success: false, error: error.message };
         }
-
-        doc.end();
-
-        await new Promise((resolve, reject) => {
-            writeStream.on('finish', resolve);
-            writeStream.on('error', reject);
-        });
-
-        console.log('PDF wygenerowany w:', savePath);
-        return { success: true, filePath: savePath };
-    } catch (error) {
-        console.error("Error generating PDF:", error);
-        return { success: false, error: error.message };
-    }
-});
+    });
     function copyFile({ sourcePath, targetPath }) {
         try {
             const src = path.resolve(sourcePath.toString());  // Konwersja na string
@@ -233,11 +290,9 @@ ipcMain.handle('export-pdf', async (event, options) => {
     });
 
   if (isDev) {
-      mainWindow.webContents.toggleDevTools();
 
     mainWindow.loadURL('http://localhost:5173'); 
   } else {
-      mainWindow.webContents.toggleDevTools();
 
     mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
   }
