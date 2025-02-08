@@ -22,7 +22,7 @@ app.whenReady().then(() => {
       const files = await fs.readdir(folderPath);
       return { success: true, files };
     } catch (error) {
-      console.error('Błąd przy odczycie plików:', error);
+      console.error('Błąd prrzy odczycie plików:', error);
       return { success: false, error: error.message };
     }
   });
