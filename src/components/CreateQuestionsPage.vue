@@ -40,7 +40,6 @@
                 </h2>
             </div>
 
-
             <!-- Wybór folderu i zdjęcia -->
             <div class="folder-section">
                 <div v-if="!selectedFolder">
@@ -190,6 +189,17 @@
             </div>
         </div>
 
+        <!-- Confirmation Popup -->
+        <div v-if="confirmationPopup.show" class="confirmation-popup-overlay">
+            <div class="confirmation-popup">
+                <p>{{ confirmationPopup.message }}</p>
+                <div class="popup-actions">
+                    <button @click="confirmAction" class="popup-save-btn">Tak</button>
+                    <button @click="cancelAction" class="popup-cancel-btn">Nie</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Powiadomienia -->
         <transition name="fade">
             <div v-if="notification" :class="['notification', notification.type]">
@@ -228,7 +238,12 @@
                 },
                 popupExplanationText: "",
                 testName: "",
-                editingTestName: false
+                editingTestName: false,
+                confirmationPopup: {
+                    show: false,
+                    message: "",
+                    callback: null,
+                },
             };
         },
         computed: {
@@ -522,9 +537,9 @@
                 this.addAnswerPending = false;
             },
             confirmRemove(index) {
-                if (confirm("Czy na pewno chcesz usunąć tę odpowiedź?")) {
+                this.openConfirmationPopup("Czy na pewno chcesz usunąć tę odpowiedź?", () => {
                     this.removeAnswer(index);
-                }
+                });
             },
             removeAnswer(index) {
                 if (this.answers.length > 1) {
@@ -552,7 +567,7 @@
             },
             async deleteCurrentFile() {
                 if (!this.currentFileName) return;
-                if (confirm(`Czy na pewno chcesz usunąć plik "${this.currentFileName}"?`)) {
+                this.openConfirmationPopup(`Czy na pewno chcesz usunąć plik "${this.currentFileName}"?`, async () => {
                     try {
                         const result = await window.electronAPI.deleteFile({
                             folder: this.selectedFolder,
@@ -569,7 +584,7 @@
                         console.error("Błąd podczas usuwania pliku:", error);
                         this.showNotification("Błąd podczas usuwania pliku", "error");
                     }
-                }
+                });
             },
             openExplanationPopup(type, answerIndex = null) {
                 this.explanationPopup.type = type;
@@ -594,6 +609,24 @@
                 this.popupExplanationText = "";
                 this.explanationPopup.type = "";
                 this.explanationPopup.answerIndex = null;
+            },
+            openConfirmationPopup(message, callback) {
+                this.confirmationPopup.message = message;
+                this.confirmationPopup.callback = callback;
+                this.confirmationPopup.show = true;
+            },
+            confirmAction() {
+                if (this.confirmationPopup.callback) {
+                    this.confirmationPopup.callback();
+                }
+                this.confirmationPopup.show = false;
+                this.confirmationPopup.message = "";
+                this.confirmationPopup.callback = null;
+            },
+            cancelAction() {
+                this.confirmationPopup.show = false;
+                this.confirmationPopup.message = "";
+                this.confirmationPopup.callback = null;
             },
             showNotification(message, type) {
                 this.notification = { message, type };
@@ -1048,6 +1081,11 @@
         transition: opacity 0.5s;
     }
 
+    .fade-enter,
+    .fade-leave-to {
+        opacity: 0;
+    }
+
     .folder-btn {
         background: linear-gradient(135deg, #42b983, #36a174);
         color: white;
@@ -1063,8 +1101,25 @@
             transform: scale(1.05);
         }
 
-    .fade-enter,
-    .fade-leave-to {
-        opacity: 0;
+    /* Confirmation Popup Styles */
+    .confirmation-popup-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    }
+
+    .confirmation-popup {
+        background: #505050;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        width: 300px;
+        text-align: center;
     }
 </style>
