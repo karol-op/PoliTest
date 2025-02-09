@@ -69,12 +69,15 @@
             <form @submit.prevent="handleSubmit">
                 <!-- Kontener dla pola pytania (relative, by umieścić przycisk wewnątrz) -->
                 <div class="form-group question-group input-container">
-                    <textarea v-model.trim="currentQuestion"
-                              placeholder="Wpisz swoje pytanie"
-                              required
-                              rows="3"
-                              class="question-input"
-                              :class="{ 'input-error': showErrors && !currentQuestion }"></textarea>
+<textarea v-model.trim="currentQuestion"
+          placeholder="Wpisz swoje pytanie"
+          required
+          rows="3"
+          class="question-input"
+          :class="{ 'input-error': showErrors && !currentQuestion }"
+          @keydown.enter.prevent
+          @input="sanitizeInput('currentQuestion')"></textarea>
+
 
                     <button type="button"
                             class="exp-btn"
@@ -120,7 +123,8 @@
                                    placeholder="Wpisz odpowiedź"
                                    class="answer-input"
                                    :class="{ 'input-error': showErrors && !answer.text }"
-                                   @input="clearAddError" />
+                                   @keydown.enter.prevent
+                                   @input="sanitizeAnswer(index)" />
                             <button type="button"
                                     class="exp-btn"
                                     @click="openExplanationPopup('answer', index)"
@@ -305,6 +309,15 @@
             window.removeEventListener("keydown", this.handleKeyDown);
         },
         methods: {
+
+            sanitizeInput(field) {
+                // Usuwamy wszystkie wystąpienia znaków nowej linii (LF i CR)
+                this[field] = this[field].replace(/[\r\n]+/g, ' ');
+            },
+
+            sanitizeAnswer(index) {
+                this.answers[index].text = this.answers[index].text.replace(/[\r\n]+/g, ' ');
+            },
             sanitize(text) {
                 return text
                     .normalize("NFD")

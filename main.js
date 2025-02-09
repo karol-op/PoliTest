@@ -1,39 +1,58 @@
 ﻿const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
+// Używamy wersji promisowej fs dla operacji asynchronicznych
 const fs = require('fs').promises;
+// Dla operacji synchronicznych (np. copyFileSync) – osobny moduł
+const fssync = require('fs');
 const { autoUpdater } = require("electron-updater");
 
 let mainWindow;
+
+function createWindow() {
+    mainWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false
+        }
+    });
+
+    const isDev = process.env.NODE_ENV === 'development';
+
+    if (isDev) {
+        mainWindow.loadURL('http://localhost:5173');
+    } else {
+        mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
+    }
+
+    Menu.setApplicationMenu(null);
+    checkForUpdates();
+}
+
 app.whenReady().then(() => {
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
+    createWindow();
 
-  const isDev = process.env.NODE_ENV === 'development';
+    // --- IPC Handlery ---
 
-  ipcMain.handle('list-files', async (event, folderPath) => {
-    try {
-      const files = await fs.readdir(folderPath);
-      return { success: true, files };
-    } catch (error) {
-      console.error('Błąd prrzy odczycie plików:', error);
-      return { success: false, error: error.message };
-    }
-  });
+    ipcMain.handle('list-files', async (event, folderPath) => {
+        try {
+            const files = await fs.readdir(folderPath);
+            return { success: true, files };
+        } catch (error) {
+            console.error('Błąd przy odczycie plików:', error);
+            return { success: false, error: error.message };
+        }
+    });
 
-  ipcMain.handle('select-folder', async () => {
-    const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
-    if (result.canceled || result.filePaths.length === 0) {
-      return null;
-    }
-    return result.filePaths[0];
-  });
+    ipcMain.handle('select-folder', async () => {
+        const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+        return result.filePaths[0];
+    });
 
     ipcMain.handle('save-file', async (event, { folder, fileName, fileContent, isBinary = false }) => {
         try {
@@ -46,11 +65,10 @@ app.whenReady().then(() => {
         }
     });
 
-
     ipcMain.handle('read-file', async (event, { folder, fileName, isBinary = false }) => {
         try {
             const filePath = path.join(folder, fileName);
-            const content = await fs.readFile(filePath, isBinary ? null : 'utf8'); // Binary mode when needed
+            const content = await fs.readFile(filePath, isBinary ? null : 'utf8');
             return { success: true, content };
         } catch (error) {
             console.error('Błąd odczytu pliku:', error);
@@ -58,54 +76,57 @@ app.whenReady().then(() => {
         }
     });
 
-  ipcMain.handle('delete-file', async (_, { folder, fileName }) => {
-    const filePath = path.join(folder, fileName);
-    try {
-      await fs.unlink(filePath);
-      return { success: true };
-    } catch (error) {
-      console.error('Błąd usuwania pliku:', error);
-      return { success: false };
-    }
-  });
-  //obsługa wyboru obrazu
-  ipcMain.handle('select-image', async () => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [
-        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] }
-      ]
+    ipcMain.handle('delete-file', async (_, { folder, fileName }) => {
+        const filePath = path.join(folder, fileName);
+        try {
+            await fs.unlink(filePath);
+            return { success: true };
+        } catch (error) {
+            console.error('Błąd usuwania pliku:', error);
+            return { success: false };
+        }
     });
-    if (result.canceled || result.filePaths.length === 0) {
-      return null;
-    }
-    return result.filePaths[0];
-  });
+
+    // Obsługa wyboru obrazu
+    ipcMain.handle('select-image', async () => {
+        const result = await dialog.showOpenDialog({
+            properties: ['openFile'],
+            filters: [
+                { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif'] }
+            ]
+        });
+        if (result.canceled || result.filePaths.length === 0) {
+            return null;
+        }
+        return result.filePaths[0];
+    });
+
     ipcMain.handle('show-save-dialog', async (event, options) => {
         const result = await dialog.showSaveDialog(options);
         return result;
     });
+
     ipcMain.handle('export-pdf', async (event, options) => {
         console.log('Eksportowanie PDF z opcjami:', options);
 
         const PDFDocument = require('pdfkit');
-        const fs = require('fs');
-        const sizeOf = require('image-size'); // Dodaj ten pakiet
+        const fsSync = require('fs'); // Używamy wersji synchronicznej dla zapisu PDF
+        const sizeOf = require('image-size'); // Upewnij się, że pakiet jest zainstalowany
 
         try {
             const { pdfContent, savePath } = options;
             const doc = new PDFDocument();
-            const writeStream = fs.createWriteStream(savePath);
+            const writeStream = fsSync.createWriteStream(savePath);
             doc.pipe(writeStream);
 
-            // Funkcja do usuwania diakrytyków
+            // Funkcja usuwająca diakrytyki
             const removeDiacritics = (str) => {
                 if (!str) return '';
                 return str
-                    .normalize("NFD") // Rozbija znaki na podstawowe litery i znaki diakrytyczne
-                    .replace(/[\u0300-\u036f]/g, "") // Usuwa znaki diakrytyczne
-                    .replace(/ł/g, 'l') // Zamienia polskie "ł" na "l"
-                    .replace(/Ł/g, 'L'); // Zamienia polskie "Ł" na "L"
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .replace(/ł/g, 'l')
+                    .replace(/Ł/g, 'L');
             };
 
             // Nagłówek
@@ -113,28 +134,20 @@ app.whenReady().then(() => {
                 .text(removeDiacritics(pdfContent.testName), { align: 'center' })
                 .moveDown(2);
 
-            // Przestrzeń robocza
             const margin = 50;
             const pageWidth = doc.page.width - 2 * margin;
             let verticalPosition = doc.y;
 
             pdfContent.questions.forEach((q, index) => {
-                // Numer pytania
                 const questionNumber = `${index + 1}. `;
                 const questionText = removeDiacritics(q.question);
+                const questionHeight = doc.heightOfString(questionNumber + questionText, { width: pageWidth });
 
-                // Oblicz wysokość tekstu pytania
-                const questionHeight = doc.heightOfString(questionNumber + questionText, {
-                    width: pageWidth
-                });
-
-                // Sprawdź miejsce na stronie
                 if (verticalPosition + questionHeight > doc.page.height - margin) {
                     doc.addPage();
                     verticalPosition = margin;
                 }
 
-                // Dodaj pytanie
                 doc.fontSize(14)
                     .text(questionNumber + questionText, { paragraphGap: 10 })
                     .moveDown(0.5);
@@ -144,29 +157,20 @@ app.whenReady().then(() => {
                 // Obsługa obrazu
                 if (q.image) {
                     try {
-                        // Wymiary obrazu
                         const dimensions = sizeOf(q.image);
                         const maxWidth = 400;
                         const ratio = maxWidth / dimensions.width;
                         const scaledHeight = dimensions.height * ratio;
 
-                        // Sprawdź miejsce na obraz
                         if (verticalPosition + scaledHeight > doc.page.height - margin) {
                             doc.addPage();
                             verticalPosition = margin;
                         }
 
-                        // Dodaj obraz
-                        doc.image(q.image, {
-                            width: maxWidth,
-                            align: 'center'
-                        });
-
-                        // Aktualizuj pozycję i dodaj odstęp
+                        doc.image(q.image, { width: maxWidth, align: 'center' });
                         verticalPosition += scaledHeight + 20;
                         doc.y = verticalPosition;
                         doc.moveDown(1);
-
                     } catch (imageError) {
                         console.error('Błąd obrazu:', imageError);
                         doc.fontSize(12)
@@ -199,12 +203,10 @@ app.whenReady().then(() => {
                         .text(answerText, { indent: 20 })
                         .moveDown(0.3);
 
-                    // Wyjaśnienie odpowiedzi
                     if (ans.explanation && pdfContent.options.includeExplanations) {
                         doc.fontSize(10)
                             .fillColor('#999')
-                            .text(`Wyjasnienie: ${removeDiacritics(ans.explanation)}`,
-                                { indent: 40 })
+                            .text(`Wyjasnienie: ${removeDiacritics(ans.explanation)}`, { indent: 40 })
                             .moveDown(0.2);
                     }
                 });
@@ -226,20 +228,21 @@ app.whenReady().then(() => {
             return { success: false, error: error.message };
         }
     });
-    function copyFile({ sourcePath, targetPath }) {
+
+    // Przykładowa funkcja kopiowania synchronizowanego (opcjonalnie)
+    function copyFileSync({ sourcePath, targetPath }) {
         try {
-            const src = path.resolve(sourcePath.toString());  // Konwersja na string
+            const src = path.resolve(sourcePath.toString());
             const dest = path.resolve(targetPath.toString());
-
             console.log(`Próba kopiowania: ${src} -> ${dest}`);
-
-            fs.copyFileSync(src, dest);
+            fssync.copyFileSync(src, dest);
             return { success: true };
         } catch (error) {
             console.error("Błąd kopiowania pliku:", error);
             return { success: false, error: error.message };
         }
     }
+
     ipcMain.handle('copy-file', async (event, { source, destination }) => {
         console.log("Source:", source, "Destination:", destination);
 
@@ -251,15 +254,14 @@ app.whenReady().then(() => {
         try {
             const src = path.resolve(source);
             const dest = path.resolve(destination);
-
-            // Check if source exists
+            // Sprawdzenie czy źródło istnieje
             const sourceExists = await fs.access(src).then(() => true).catch(() => false);
             if (!sourceExists) {
                 return { success: false, error: `Source file not found: ${src}` };
             }
 
             console.log(`Copying file from: ${src} -> ${dest}`);
-            await fs.copyFile(src, dest); // Używamy asynchronicznej fs.copyFile
+            await fs.copyFile(src, dest);
             console.log("File copied!");
             return { success: true };
         } catch (error) {
@@ -268,9 +270,8 @@ app.whenReady().then(() => {
         }
     });
 
-
     ipcMain.handle('copyFile', async (event, { source, destination }) => {
-        console.log("Źródło:", source, "Cel:", destination); // Debug
+        console.log("Źródło:", source, "Cel:", destination);
 
         if (typeof source !== "string" || typeof destination !== "string") {
             console.error("Nieprawidłowe argumenty: source i destination muszą być stringami!");
@@ -281,7 +282,6 @@ app.whenReady().then(() => {
             const src = path.resolve(source);
             const dest = path.resolve(destination);
             console.log(`Kopiowanie pliku z: ${src} -> ${dest}`);
-
             await fs.copyFile(src, dest);
             console.log("Plik skopiowany!");
             return { success: true };
@@ -291,18 +291,7 @@ app.whenReady().then(() => {
         }
     });
 
-  if (isDev) {
-
-    mainWindow.loadURL('http://localhost:5173'); 
-  } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'));
-  }
-
-    Menu.setApplicationMenu(null);
-    checkForUpdates();
-    function checkForUpdates() {
-        autoUpdater.checkForUpdatesAndNotify();
-    }
+    // --- AutoUpdater ---
 
     autoUpdater.on("update-available", () => {
         const response = dialog.showMessageBoxSync(mainWindow, {
@@ -328,9 +317,30 @@ app.whenReady().then(() => {
         if (response === 0) {
             autoUpdater.quitAndInstall();
         }
-  app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-      app.quit();
-    }
-  });
+    });
+
+    // Dodajemy zdarzenie update-not-available – informuje użytkownika, że nie ma aktualizacji
+    autoUpdater.on("update-not-available", () => {
+        dialog.showMessageBox(mainWindow, {
+            type: "info",
+            title: "Brak aktualizacji",
+            message: "Aktualnie korzystasz z najnowszej wersji aplikacji."
+        });
+    });
+
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
 });
+
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+function checkForUpdates() {
+    autoUpdater.checkForUpdatesAndNotify();
+}

@@ -1,6 +1,6 @@
 {
   "name": "politest",
-  "version": "0.11.0",
+  "version": "0.8.8",
   "description": "oby 3",
   "main": "main.js",
   "scripts": {
@@ -34,6 +34,15 @@
       "node_modules/**/*",
       "main.js",
       "preload.js"
-    ]
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "karol-op",
+      "repo": "PoliTest",
+      "releaseType": "release"
+    }
   }
+
+  
 }
+
