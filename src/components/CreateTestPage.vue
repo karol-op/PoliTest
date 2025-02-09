@@ -138,6 +138,10 @@
         font-size: 0.9rem; /* zmniejszony rozmiar czcionki */
         text-decoration: none;
         transition: all 0.3s ease;
+        /* Wyśrodkowanie tekstu */
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
         .merging-btn:hover {

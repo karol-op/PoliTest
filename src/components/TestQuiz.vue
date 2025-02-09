@@ -301,20 +301,16 @@
             // -----------------------------------
             const maxDuplicateMap = ref({});
 
-            // Obliczanie opanowanych pytań – przyjmujemy, że klucz to: "fileName:question"
+            // Obliczanie opanowanych pytań – przyjmujemy, że klucz to questionId
             const masteredQuestions = computed(() => {
                 let count = 0;
                 for (const key in maxDuplicateMap.value) {
-                    const entries = history.value.filter(entry => {
-                        const entryKey = `${entry.question.fileName}:${entry.question.question}`;
-                        return entryKey === key;
-                    });
+                    // Filtrujemy historię według questionId
+                    const entries = history.value.filter(entry => entry.question.questionId === key);
                     const finalEntry = entries.reduce((prev, current) =>
                         (!prev || current.question.repeatNumber > prev.question.repeatNumber) ? current : prev, null);
-                    const pendingForQuestion = pendingQuestions.value.filter(q => {
-                        const qKey = `${q.fileName}:${q.question}`;
-                        return qKey === key;
-                    });
+                    // Szukamy w kolejce (pendingQuestions) instancji z tym samym questionId
+                    const pendingForQuestion = pendingQuestions.value.filter(q => q.questionId === key);
                     if (finalEntry && finalEntry.correct && pendingForQuestion.length === 0) {
                         count++;
                     }
@@ -356,8 +352,8 @@
                         } else {
                             let initialQueue = [];
                             loadedQuestions.forEach(q => {
-                                const key = `${q.fileName}:${q.question}`;
-                                maxDuplicateMap.value[key] = initialRepetitions.value;
+                                // Używamy questionId
+                                maxDuplicateMap.value[q.questionId] = initialRepetitions.value;
                                 for (let i = 1; i <= initialRepetitions.value; i++) {
                                     initialQueue.push({ ...q, repeatNumber: i });
                                 }
@@ -393,6 +389,8 @@
                     offset = 2;
                 }
                 const questionText = lines[offset];
+                // Obliczamy questionId jako kombinację nazwy pliku i treści pytania
+                const questionId = `${fileName}:${questionText}`;
                 let questionExplanation = null;
                 let answerLines = [];
                 if (lines[offset + 1] && lines[offset + 1].startsWith("[exp]") && lines[offset + 1].endsWith("[/exp]")) {
@@ -420,7 +418,14 @@
                     });
                     bitIndex++;
                 }
-                return { question: questionText, explanation: questionExplanation, image, answers, fileName };
+                return {
+                    question: questionText,
+                    explanation: questionExplanation,
+                    image,
+                    answers,
+                    fileName,
+                    questionId // Dodajemy właściwość questionId
+                };
             };
 
             // -----------------------------------
@@ -457,22 +462,30 @@
             // -----------------------------------
             const confirmAnswers = () => {
                 if (selectedAnswers.value.length === 0) return;
+
                 if (!startTime.value) {
                     startTime.value = Date.now();
                     timerInterval = setInterval(() => {
                         elapsedTime.value = Math.floor((Date.now() - startTime.value) / 1000);
                     }, 1000);
                 }
-                const correctAnswers = pendingQuestions.value[0].answers.filter(a => a.correct);
+
+                const currentQuestion = pendingQuestions.value[0];
+                const correctAnswers = currentQuestion.answers.filter(a => a.correct);
                 const isCorrect = (correctAnswers.length === selectedAnswers.value.length) &&
                     selectedAnswers.value.every(a => a.correct);
+
                 history.value.push({
-                    question: pendingQuestions.value[0],
+                    question: currentQuestion,
                     selected: [...selectedAnswers.value],
                     correct: isCorrect
                 });
-                if (!isCorrect) {
-                    const currentRepeat = pendingQuestions.value[0].repeatNumber || 1;
+
+                if (isCorrect) {
+                    // Przy poprawnej odpowiedzi usuwamy tylko bieżącą instancję pytania.
+                    pendingQuestions.value.shift();
+                } else {
+                    const currentRepeat = currentQuestion.repeatNumber || 1;
                     let copies = additionalRepetitions.value + 1;
                     const available = maximumRepetitions.value - currentRepeat;
                     if (copies > available) copies = available;
@@ -480,16 +493,19 @@
                         const newRepeat = currentRepeat + i;
                         if (newRepeat > maximumRepetitions.value) break;
                         pendingQuestions.value.push({
-                            ...pendingQuestions.value[0],
+                            ...currentQuestion,
                             repeatNumber: newRepeat
                         });
-                        const key = `${pendingQuestions.value[0].fileName}:${pendingQuestions.value[0].question}`;
+                        // Używamy questionId do aktualizacji mapy powtórzeń
+                        const key = currentQuestion.questionId;
                         if (!maxDuplicateMap.value[key] || maxDuplicateMap.value[key] < newRepeat) {
                             maxDuplicateMap.value[key] = newRepeat;
                         }
                     }
+                    pendingQuestions.value.shift();
+                    pendingQuestions.value = shuffleArray(pendingQuestions.value);
                 }
-                pendingQuestions.value.shift();
+
                 selectedAnswers.value = [];
                 currentDisplayIndex.value = history.value.length - 1;
                 progressSaved.value = false;
@@ -591,7 +607,7 @@
             };
 
             // -----------------------------------
-            // Wczytywanie postępu (bez porównywania testName) – przekazujemy zapisany ciąg JSON
+            // Wczytywanie postępu – wczytujemy zapisany stan dla aktualnego testu
             // -----------------------------------
             const loadProgress = (data) => {
                 try {
@@ -604,7 +620,7 @@
                     // Przebuduj maxDuplicateMap na podstawie historii
                     maxDuplicateMap.value = {};
                     history.value.forEach(entry => {
-                        const key = `${entry.question.fileName}:${entry.question.question}`;
+                        const key = entry.question.questionId;
                         if (!maxDuplicateMap.value[key] || entry.question.repeatNumber > maxDuplicateMap.value[key]) {
                             maxDuplicateMap.value[key] = entry.question.repeatNumber;
                         }
