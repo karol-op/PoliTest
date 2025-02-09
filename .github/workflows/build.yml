@@ -3,43 +3,28 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'  # Uruchamia się, gdy pushujesz tagi wersji, np. "v1.0.0"
-  workflow_dispatch:  # Umożliwia ręczne uruchomienie workflow
+      - 'v*.*.*'   # Workflow uruchomi się przy wypchnięciu tagu w formacie np. v1.0.0
+
 jobs:
   build:
-    runs-on: windows-latest  # Używamy Windowsa do budowania exe
+    runs-on: windows-latest  # Budujemy na Windowsie, aby wygenerować plik .exe
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: '16'     # Możesz wybrać wersję Node, której potrzebujesz
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build Electron app
-        run: npm run build
+      - name: Build application (frontend)
+        run: npm run build     # Jeśli masz osobny skrypt budujący front-end
 
-      - name: Debug dist folder
-        run: ls -R dist  # Wyświetl zawartość folderu dist
-
-      - name: Package app for Windows
-        run: npx electron-builder --win --publish never
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: PoliTest-windows
-          path: dist/*.exe
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*.exe
-          token: ${{ secrets.GH_TOKEN }}
-          tag_name: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
+      - name: Package application with electron-builder
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
