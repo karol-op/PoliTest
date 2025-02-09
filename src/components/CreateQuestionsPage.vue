@@ -309,7 +309,6 @@
             window.removeEventListener("keydown", this.handleKeyDown);
         },
         methods: {
-
             sanitizeInput(field) {
                 // Usuwamy wszystkie wystąpienia znaków nowej linii (LF i CR)
                 this[field] = this[field].replace(/[\r\n]+/g, ' ');
@@ -318,6 +317,17 @@
             sanitizeAnswer(index) {
                 this.answers[index].text = this.answers[index].text.replace(/[\r\n]+/g, ' ');
             },
+
+            // Nowa metoda do sanitizacji wyjaśnień (dla pytania)
+            sanitizeExplanation(field) {
+                this[field] = this[field].replace(/[\r\n]+/g, ' ');
+            },
+
+            // Nowa metoda do sanitizacji wyjaśnień (dla odpowiedzi)
+            sanitizeAnswerExplanation(index) {
+                this.answers[index].explanation = this.answers[index].explanation.replace(/[\r\n]+/g, ' ');
+            },
+
             sanitize(text) {
                 return text
                     .normalize("NFD")
@@ -616,6 +626,8 @@
                 this.explanationPopup.show = true;
             },
             saveExplanation() {
+                // Zamieniamy enter (znaki nowej linii) na spację przed zapisaniem wyjaśnienia
+                this.popupExplanationText = this.popupExplanationText.replace(/[\r\n]+/g, ' ');
                 if (this.explanationPopup.type === "question") {
                     this.questionExplanation = this.popupExplanationText;
                 } else if (this.explanationPopup.type === "answer" && this.explanationPopup.answerIndex !== null) {
@@ -663,6 +675,7 @@
         },
     };
 </script>
+
 
 <style scoped>
     .image-actions {
@@ -887,7 +900,7 @@
         }
 
     .file-list-section {
-        width: 175px;
+        width: 200px;
         min-height: 600px;
         background: #404040;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);

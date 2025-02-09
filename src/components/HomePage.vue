@@ -88,6 +88,11 @@
             </div>
         </div>
 
+        <!-- Pasek postępu aktualizacji – wyświetlany na dole strony -->
+        <div class="update-progress" v-if="updateProgress !== null">
+            <div class="progress-bar" :style="{ width: updateProgress + '%' }"></div>
+            <span class="progress-text">{{ Math.round(updateProgress) }}%</span>
+        </div>
     </div>
 </template>
 
@@ -128,6 +133,9 @@
     const testName = ref("")
     const maxDuplicateMap = ref({})
     const initialRepetitions = ref(1) // Domyślna liczba powtórzeń
+
+    // Nowa zmienna przechowująca postęp aktualizacji (w %)
+    const updateProgress = ref(null)
 
     // -------------------------
     // Funkcje dotyczące testów ostatnich/wyboru folderu
@@ -487,11 +495,25 @@
 
     onMounted(() => {
         loadRecentTests()
+
+        // Nasłuchujemy zdarzenia 'download-progress' wysyłanego z main.js
+        if (window.electronAPI && window.electronAPI.on) {
+            window.electronAPI.on('download-progress', (progress) => {
+                updateProgress.value = progress
+                // Opcjonalnie: ukryć pasek gdy postęp osiągnie 100%
+                if (progress >= 100) {
+                    setTimeout(() => {
+                        updateProgress.value = null
+                    }, 1000)
+                }
+            })
+        }
     })
 </script>
 
 <style scoped>
-    /* (Style pozostają bez zmian – kopiujemy Twoje obecne style) */
+    /* Twoje dotychczasowe style pozostają bez zmian */
+
     .action-dialog-overlay {
         position: fixed;
         top: 0;
@@ -750,5 +772,31 @@
     .test-item:hover {
         background-color: #3d3d3d;
         transform: translateX(5px);
+    }
+
+    /* Style dla paska postępu aktualizacji */
+    .update-progress {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 5px;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+    }
+
+    .progress-bar {
+        height: 10px;
+        background-color: #42b983;
+        transition: width 0.2s ease;
+        flex-grow: 1;
+        margin-right: 10px;
+    }
+
+    .progress-text {
+        color: white;
+        font-size: 0.9rem;
     }
 </style>

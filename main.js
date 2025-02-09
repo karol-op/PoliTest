@@ -346,6 +346,9 @@ app.on('window-all-closed', () => {
         app.quit();
     }
 });
+autoUpdater.on("download-progress", (progressObj) => {
+    mainWindow.webContents.send("download-progress", progressObj.percent);
+});
 
 function checkForUpdates() {
     autoUpdater.checkForUpdatesAndNotify();
