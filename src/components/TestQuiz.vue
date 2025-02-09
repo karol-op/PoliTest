@@ -53,9 +53,9 @@
                             <div class="answer-wrapper">
                                 <button @click="selectAnswer(answer)"
                                         :class="[ isSelected(answer) ? 'selected' : '',
-                                  { correct: inReviewMode && isSelected(answer) && answer.correct,
-                                    missed: inReviewMode && !isSelected(answer) && answer.correct,
-                                    incorrect: inReviewMode && isSelected(answer) && !answer.correct } ]"
+                                                  { correct: inReviewMode && isSelected(answer) && answer.correct,
+                                                    missed: inReviewMode && !isSelected(answer) && answer.correct,
+                                                    incorrect: inReviewMode && isSelected(answer) && !answer.correct } ]"
                                         :disabled="inReviewMode"
                                         class="answer-btn">
                                     {{ answer.text }}
@@ -77,6 +77,11 @@
                     <button v-else @click="confirmAnswers" class="confirm-btn" :disabled="selectedAnswers.length === 0">
                         Potwierdź wybory
                     </button>
+                </div>
+
+                <!-- Nowy element: wyświetlanie nazwy pliku z aktualnym pytaniem -->
+                <div v-if="inReviewMode && displayedQuestion && displayedQuestion.fileName" class="file-info">
+                    {{ displayedQuestion.fileName }}
                 </div>
             </div>
         </div>
@@ -152,13 +157,11 @@
             // Zoom obrazka
             const showZoomedImage = ref(false);
             const currentZoomedImage = ref(null);
-
             const zoomImage = (imageUrl) => {
-                console.log("Zooming image:", imageUrl); // Debugowanie
+                console.log("Zooming image:", imageUrl);
                 currentZoomedImage.value = imageUrl;
                 showZoomedImage.value = true;
             };
-
             const closeZoom = () => {
                 showZoomedImage.value = false;
                 currentZoomedImage.value = null;
@@ -226,13 +229,11 @@
             const explanationPopupVisible = ref(false);
             const explanationPopupText = ref("");
             const explanationPopupTitle = ref("");
-
             const openExplanation = (title, text) => {
                 explanationPopupTitle.value = title;
                 explanationPopupText.value = text;
                 explanationPopupVisible.value = true;
             };
-
             const closeExplanation = () => {
                 explanationPopupVisible.value = false;
             };
@@ -260,7 +261,6 @@
                 }
                 return count;
             });
-
             const masteredPercentage = computed(() =>
                 totalQuestions.value > 0 ? (masteredQuestions.value / totalQuestions.value) * 100 : 0
             );
@@ -380,7 +380,6 @@
                 }
                 progressSaved.value = false;
             };
-
             const isSelected = (answer) => {
                 return displayedSelectedAnswers.value.includes(answer);
             };
@@ -432,7 +431,6 @@
                     currentDisplayIndex.value--;
                 }
             };
-
             // Nawigacja – przejście do przodu
             const goForward = () => {
                 if (inReviewMode.value) {
@@ -471,11 +469,9 @@
             const openSettings = () => {
                 showSettingsPopup.value = true;
             };
-
             const closeSettings = () => {
                 showSettingsPopup.value = false;
             };
-
             const saveSettings = () => {
                 if (initialRepetitions.value > maximumRepetitions.value) {
                     alert("Wstępne powtórzenia nie mogą być większe niż maksymalna liczba powtórzeń.");
@@ -561,7 +557,6 @@
                         e.returnValue = "Masz niezapisany postęp testu. Czy chcesz zapisać postęp?";
                     }
                 });
-
             });
 
             return {
@@ -611,6 +606,15 @@
 </script>
 
 <style scoped>
+
+    /* Nowy styl dla wyświetlania nazwy pliku z aktualnym pytaniem */
+    .file-info {
+        font-size: 0.8rem;
+        color: #aaa;
+        margin-top: 10px;
+        text-align: center;
+    }
+
     .image-zoom-popup {
         position: fixed;
         top: 0;
@@ -663,6 +667,7 @@
         .question-image:hover {
             transform: scale(1.02);
         }
+
     .quiz-wrapper {
         display: flex;
         gap: 2rem;

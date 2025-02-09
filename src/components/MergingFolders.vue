@@ -37,35 +37,44 @@
                 Scal foldery
             </button>
         </section>
+    </div>
 
-        <section class="merge-status" v-if="mergeStatus">
-            <p>{{ mergeStatus }}</p>
-        </section>
+    <!-- Pop-up notyfikacji wewnątrz aplikacji -->
+    <div v-if="notificationPopupVisible" class="notification-popup">
+        <div class="notification-content">
+            <p>{{ notificationPopupText }}</p>
+            <button @click="closeNotification" class="close-notif-btn">OK</button>
+        </div>
     </div>
 </template>
 
 <script>
     import { ref, computed } from "vue";
     import { useRouter } from "vue-router";
-    import path from 'path';
+    import path from "path";
 
     export default {
         name: "MergingFolders",
         setup() {
+            // Pomocnicze funkcje do operacji na nazwach plików
             function getFileExtension(filename) {
                 return filename.slice(((filename.lastIndexOf(".") - 1) >>> 0) + 2);
             }
-
             function getFileNameWithoutExtension(filename) {
                 return filename.slice(0, (filename.lastIndexOf(".") >>> 0));
             }
+
             const router = useRouter();
 
+            // Zmienne główne
             const sourceFolders = ref([]);
             const targetFolder = ref(null);
             const testName = ref("");
-            const mergeStatus = ref("");
+            // Zmienna na wewnętrzny pop-up notyfikacji
+            const notificationPopupVisible = ref(false);
+            const notificationPopupText = ref("");
 
+            // Zmienna pomocnicza – warunek, czy można rozpocząć scalanie
             const canMerge = computed(
                 () =>
                     sourceFolders.value.length > 0 &&
@@ -73,14 +82,43 @@
                     testName.value.trim() !== ""
             );
 
+            // Funkcja do wyświetlania notyfikacji wewnętrznego pop-upu
+            function showNotification(text) {
+                notificationPopupText.value = text;
+                notificationPopupVisible.value = true;
+            }
+            function closeNotification() {
+                notificationPopupVisible.value = false;
+                notificationPopupText.value = "";
+            }
+
+            // Dodaj folder źródłowy – najpierw sprawdzamy, czy folder zawiera co najmniej jeden obsługiwany plik
             async function addSourceFolder() {
                 try {
                     const folderPath = await window.electronAPI.selectFolder();
                     if (folderPath && !sourceFolders.value.includes(folderPath)) {
+                        const result = await window.electronAPI.listFiles(folderPath);
+                        if (result.success) {
+                            // Filtrujemy pliki o obsługiwanych rozszerzeniach, pomijając "testname.txt"
+                            const validFiles = result.files.filter((file) => {
+                                const ext = getFileExtension(file).toLowerCase();
+                                return (
+                                    ["txt", "png", "jpg", "jpeg"].includes(ext) &&
+                                    file.toLowerCase() !== "testname.txt"
+                                );
+                            });
+                            if (validFiles.length === 0) {
+                                showNotification(
+                                    "Wybrany folder źródłowy nie zawiera żadnych obsługiwanych plików."
+                                );
+                                return;
+                            }
+                        }
                         sourceFolders.value.push(folderPath);
                     }
                 } catch (error) {
                     console.error("Błąd przy wybieraniu folderu źródłowego:", error);
+                    showNotification("Błąd przy wybieraniu folderu źródłowego.");
                 }
             }
 
@@ -96,13 +134,14 @@
                     }
                 } catch (error) {
                     console.error("Błąd przy wybieraniu folderu docelowego:", error);
+                    showNotification("Błąd przy wybieraniu folderu docelowego.");
                 }
             }
 
+            // Funkcja scalająca foldery
             async function mergeFolders() {
                 if (!canMerge.value) return;
-                mergeStatus.value = "Rozpoczynanie scalania...";
-
+                showNotification("Rozpoczynanie scalania...");
                 let mergedFilesCount = 0;
                 const existingFiles = new Set();
 
@@ -111,43 +150,40 @@
                         const result = await window.electronAPI.listFiles(source);
                         if (result.success) {
                             for (const file of result.files) {
+                                // Pomijamy plik "testname.txt"
+                                if (file.toLowerCase() === "testname.txt") continue;
+
                                 const ext = getFileExtension(file);
                                 const baseName = getFileNameWithoutExtension(file);
-
-                                if (!["txt", "png", "jpg", "jpeg"].includes(ext.toLowerCase())) {
-                                    continue; // Skip unsupported file types
-                                }
+                                if (!["txt", "png", "jpg", "jpeg"].includes(ext.toLowerCase()))
+                                    continue; // pomijamy nieobsługiwane typy plików
 
                                 let newFileName = file;
                                 let version = 1;
-
                                 while (existingFiles.has(newFileName.toLowerCase())) {
                                     version++;
                                     newFileName = `${baseName}_v${version}.${ext}`;
                                 }
                                 existingFiles.add(newFileName.toLowerCase());
 
-                                // Read file content (binary mode for images)
+                                // Odczytujemy zawartość pliku (tryb binarny dla obrazów)
                                 const isBinary = ["png", "jpg", "jpeg"].includes(ext.toLowerCase());
                                 const readResult = await window.electronAPI.readFile({
                                     folder: source,
                                     fileName: file,
                                     isBinary: isBinary,
                                 });
-
                                 if (!readResult.success) {
                                     console.warn(`Nie udało się odczytać pliku ${file}`);
                                     continue;
                                 }
-
-                                // Save the file
+                                // Zapisujemy plik do folderu docelowego
                                 const saveResult = await window.electronAPI.saveFile({
                                     folder: targetFolder.value,
                                     fileName: newFileName,
                                     fileContent: readResult.content,
-                                    isBinary: isBinary, // Ensure binary images remain binary
+                                    isBinary: isBinary,
                                 });
-
                                 if (saveResult.success) {
                                     mergedFilesCount++;
                                 } else {
@@ -160,16 +196,19 @@
                     }
                 }
 
-
-
-                mergeStatus.value = `Scalanie zakończone. Skopiowano ${mergedFilesCount} plików.`;
-                if (Object.keys(duplicateCount).length > 0) {
-                    mergeStatus.value += ` Znaleziono duplikaty: ${Object.entries(duplicateCount)
-                        .map(([name, count]) => `${name} (${count})`)
-                        .join(", ")}`;
-                }
+                // Zapisujemy plik "testname.txt" w folderze docelowym z nazwą testu wprowadzoną przez użytkownika
+                const saveTestNameResult = await window.electronAPI.saveFile({
+                    folder: targetFolder.value,
+                    fileName: "testname.txt",
+                    fileContent: testName.value,
+                    isBinary: false,
+                });
+                showNotification(
+                    `Scalanie zakończone. Skopiowano ${mergedFilesCount} plików.`
+                );
             }
 
+            // Funkcja pomocnicza – sanitizacja tekstu (opcjonalnie)
             function sanitize(text) {
                 return text
                     .normalize("NFD")
@@ -188,7 +227,7 @@
                 sourceFolders,
                 targetFolder,
                 testName,
-                mergeStatus,
+                mergeStatus: notificationPopupText, // opcjonalnie, jeśli chcesz odwołać się do treści pop-upu
                 canMerge,
                 addSourceFolder,
                 removeSourceFolder,
@@ -196,6 +235,10 @@
                 mergeFolders,
                 goToMainMenu,
                 sanitize,
+                // Pop-up notyfikacji
+                notificationPopupVisible,
+                notificationPopupText,
+                closeNotification,
             };
         },
     };
@@ -233,6 +276,7 @@
         align-items: center;
         justify-content: center;
         transition: transform 0.2s;
+        margin-right: 1rem;
     }
 
         .menu-btn:hover {
@@ -250,8 +294,7 @@
     .folder-selection,
     .target-folder,
     .test-name-selection,
-    .merge-actions,
-    .merge-status {
+    .merge-actions {
         margin-bottom: 1.5rem;
     }
 
@@ -335,8 +378,41 @@
             transform: translateY(-2px);
         }
 
-    .merge-status {
-        text-align: center;
-        font-size: 1.1rem;
+    /* Style dla pop-up notyfikacji */
+    .notification-popup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
     }
+
+    .notification-content {
+        background: #1a1a1a;
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        max-width: 80%;
+        text-align: center;
+    }
+
+    .close-notif-btn {
+        margin-top: 15px;
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        background: #42b983;
+        color: #fff;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+        .close-notif-btn:hover {
+            transform: translateY(-2px);
+        }
 </style>
