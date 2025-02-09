@@ -53,9 +53,9 @@
                             <div class="answer-wrapper">
                                 <button @click="selectAnswer(answer)"
                                         :class="[ isSelected(answer) ? 'selected' : '',
-                                                  { correct: inReviewMode && isSelected(answer) && answer.correct,
-                                                    missed: inReviewMode && !isSelected(answer) && answer.correct,
-                                                    incorrect: inReviewMode && isSelected(answer) && !answer.correct } ]"
+                                  { correct: inReviewMode && isSelected(answer) && answer.correct,
+                                    missed: inReviewMode && !isSelected(answer) && answer.correct,
+                                    incorrect: inReviewMode && isSelected(answer) && !answer.correct } ]"
                                         :disabled="inReviewMode"
                                         class="answer-btn">
                                     {{ answer.text }}
@@ -79,12 +79,13 @@
                     </button>
                 </div>
 
-                <!-- Nowy element: wyświetlanie nazwy pliku z aktualnym pytaniem -->
+                <!-- Wyświetlanie nazwy pliku z aktualnym pytaniem -->
                 <div v-if="inReviewMode && displayedQuestion && displayedQuestion.fileName" class="file-info">
                     {{ displayedQuestion.fileName }}
                 </div>
             </div>
         </div>
+
         <!-- Popup powiększonego obrazka -->
         <div v-if="showZoomedImage" class="image-zoom-popup" @click.self="closeZoom">
             <div class="zoomed-image-container">
@@ -92,6 +93,7 @@
                 <button @click="closeZoom" class="close-zoom-btn">×</button>
             </div>
         </div>
+
         <!-- Panel statystyk -->
         <div class="stats-panel">
             <h2>Statystyki</h2>
@@ -142,11 +144,24 @@
                 <button @click="closeExplanation" class="close-explanation-btn">Zamknij</button>
             </div>
         </div>
+
+        <!-- Custom popup (zamiast window.confirm/alert) -->
+        <div v-if="customPopup.visible" class="custom-popup">
+            <div class="custom-popup-content">
+                <h2>{{ customPopup.title }}</h2>
+                <p>{{ customPopup.message }}</p>
+                <div class="popup-buttons">
+                    <button v-if="customPopup.type === 'confirm'" @click="customPopupConfirm" class="popup-btn">Tak</button>
+                    <button v-if="customPopup.type === 'confirm'" @click="customPopupCancel" class="popup-btn">Nie</button>
+                    <button v-if="customPopup.type === 'alert'" @click="customPopupConfirm" class="popup-btn">OK</button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script>
-    import { ref, computed, onMounted, watch } from 'vue';
+    import { ref, reactive, computed, onMounted, watch } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
 
     export default {
@@ -154,7 +169,44 @@
         setup() {
             console.log("Setting up TestQuiz component");
 
+            // -----------------------------------
+            // Mechanizm Custom Popup
+            // -----------------------------------
+            const customPopup = reactive({
+                visible: false,
+                type: '', // 'confirm' lub 'alert'
+                title: '',
+                message: '',
+                onConfirm: null,
+                onCancel: null,
+            });
+
+            const showCustomPopup = (type, title, message, onConfirm, onCancel) => {
+                customPopup.type = type;
+                customPopup.title = title;
+                customPopup.message = message;
+                customPopup.onConfirm = onConfirm;
+                customPopup.onCancel = onCancel;
+                customPopup.visible = true;
+            };
+
+            const customPopupConfirm = () => {
+                if (customPopup.onConfirm) {
+                    customPopup.onConfirm();
+                }
+                customPopup.visible = false;
+            };
+
+            const customPopupCancel = () => {
+                if (customPopup.onCancel) {
+                    customPopup.onCancel();
+                }
+                customPopup.visible = false;
+            };
+
+            // -----------------------------------
             // Zoom obrazka
+            // -----------------------------------
             const showZoomedImage = ref(false);
             const currentZoomedImage = ref(null);
             const zoomImage = (imageUrl) => {
@@ -167,7 +219,9 @@
                 currentZoomedImage.value = null;
             };
 
+            // -----------------------------------
             // Ustawienia quizu
+            // -----------------------------------
             const totalQuestions = ref(0);
             const storedSettings = JSON.parse(localStorage.getItem("quizSettings") || "{}");
             const additionalRepetitions = ref(storedSettings.additionalRepetitions ?? 1);
@@ -203,13 +257,15 @@
 
             // Pytanie wyświetlane zależy od trybu
             const displayedQuestion = computed(() =>
-                inReviewMode.value ? history.value[currentDisplayIndex.value].question
+                inReviewMode.value
+                    ? history.value[currentDisplayIndex.value].question
                     : pendingQuestions.value[0] || {}
             );
 
             // Wybrane odpowiedzi – z historii lub bieżące
             const displayedSelectedAnswers = computed(() =>
-                inReviewMode.value ? history.value[currentDisplayIndex.value].selected
+                inReviewMode.value
+                    ? history.value[currentDisplayIndex.value].selected
                     : selectedAnswers.value
             );
 
@@ -225,7 +281,9 @@
                 return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             });
 
+            // -----------------------------------
             // Popup wyjaśnień
+            // -----------------------------------
             const explanationPopupVisible = ref(false);
             const explanationPopupText = ref("");
             const explanationPopupTitle = ref("");
@@ -238,7 +296,9 @@
                 explanationPopupVisible.value = false;
             };
 
+            // -----------------------------------
             // Mapa powtórzeń – po wczytaniu stanu będziemy ją przebudowywać
+            // -----------------------------------
             const maxDuplicateMap = ref({});
 
             // Obliczanie opanowanych pytań – przyjmujemy, że klucz to: "fileName:question"
@@ -265,7 +325,9 @@
                 totalQuestions.value > 0 ? (masteredQuestions.value / totalQuestions.value) * 100 : 0
             );
 
+            // -----------------------------------
             // Ładowanie pytań
+            // -----------------------------------
             const loadQuestions = async () => {
                 if (!folder) {
                     error.value = "Brak wybranego folderu.";
@@ -316,7 +378,9 @@
                 }
             };
 
+            // -----------------------------------
             // Parsowanie pytania
+            // -----------------------------------
             const parseQuestion = (content, fileName) => {
                 const lines = content.split("\n").map(l => l.trim()).filter(l => l !== "");
                 if (lines.length < 2) return null;
@@ -359,7 +423,9 @@
                 return { question: questionText, explanation: questionExplanation, image, answers, fileName };
             };
 
+            // -----------------------------------
             // Mieszanie tablicy
+            // -----------------------------------
             const shuffleArray = (array) => {
                 const newArray = array.slice();
                 for (let i = newArray.length - 1; i > 0; i--) {
@@ -369,7 +435,9 @@
                 return newArray;
             };
 
+            // -----------------------------------
             // Obsługa wyboru odpowiedzi – tylko dla bieżącego pytania
+            // -----------------------------------
             const selectAnswer = (answer) => {
                 if (inReviewMode.value) return;
                 const index = selectedAnswers.value.indexOf(answer);
@@ -384,7 +452,9 @@
                 return displayedSelectedAnswers.value.includes(answer);
             };
 
+            // -----------------------------------
             // Zatwierdzanie bieżącej odpowiedzi
+            // -----------------------------------
             const confirmAnswers = () => {
                 if (selectedAnswers.value.length === 0) return;
                 if (!startTime.value) {
@@ -425,13 +495,14 @@
                 progressSaved.value = false;
             };
 
-            // Nawigacja – cofanie
+            // -----------------------------------
+            // Nawigacja – cofanie i przejście do kolejnego pytania
+            // -----------------------------------
             const goBack = () => {
                 if (currentDisplayIndex.value > 0) {
                     currentDisplayIndex.value--;
                 }
             };
-            // Nawigacja – przejście do przodu
             const goForward = () => {
                 if (inReviewMode.value) {
                     if (currentDisplayIndex.value < history.value.length - 1) {
@@ -442,14 +513,26 @@
                 }
             };
 
-            // Przejście do strony głównej – jeśli postęp niezapisany, zapytaj, ale nie blokuj wyjścia
+            // -----------------------------------
+            // Przejście do strony głównej
+            // -----------------------------------
             const goToMainMenu = () => {
                 if (!progressSaved.value && (history.value.length > 0 || pendingQuestions.value.length > 0)) {
-                    if (window.confirm("Masz niezapisany postęp testu. Czy chcesz zapisać postęp przed powrotem do strony głównej?")) {
-                        saveProgress();
-                    }
+                    showCustomPopup(
+                        'confirm',
+                        'Niezapisany postęp',
+                        'Masz niezapisany postęp testu. Czy chcesz zapisać postęp przed powrotem do strony głównej?',
+                        () => {
+                            saveProgress();
+                            router.push("/");
+                        },
+                        () => {
+                            router.push("/");
+                        }
+                    );
+                } else {
+                    router.push("/");
                 }
-                router.push("/");
             };
 
             const restartQuiz = () => {
@@ -474,7 +557,12 @@
             };
             const saveSettings = () => {
                 if (initialRepetitions.value > maximumRepetitions.value) {
-                    alert("Wstępne powtórzenia nie mogą być większe niż maksymalna liczba powtórzeń.");
+                    showCustomPopup(
+                        'alert',
+                        'Błąd',
+                        'Wstępne powtórzenia nie mogą być większe niż maksymalna liczba powtórzeń.',
+                        () => { }
+                    );
                     return;
                 }
                 localStorage.setItem("quizSettings", JSON.stringify({
@@ -485,20 +573,26 @@
                 showSettingsPopup.value = false;
             };
 
-            // Zapis postępu
+            // -----------------------------------
+            // Zapis postępu – używamy klucza "quizProgress_<testName>"
+            // -----------------------------------
             const saveProgress = () => {
                 const progressData = {
+                    testName: testName.value,
                     history: history.value,
                     pendingQuestions: pendingQuestions.value,
                     currentDisplayIndex: currentDisplayIndex.value,
                     elapsedTime: elapsedTime.value
                 };
-                localStorage.setItem("quizProgress", JSON.stringify(progressData));
+                const key = `quizProgress_${testName.value}`;
+                localStorage.setItem(key, JSON.stringify(progressData));
                 progressSaved.value = true;
-                alert("Postęp zapisany!");
+                showCustomPopup('alert', 'Sukces', 'Postęp zapisany!', () => { });
             };
 
-            // Ładowanie postępu – po wczytaniu odtwórz stan i przebuduj maxDuplicateMap
+            // -----------------------------------
+            // Wczytywanie postępu (bez porównywania testName) – przekazujemy zapisany ciąg JSON
+            // -----------------------------------
             const loadProgress = (data) => {
                 try {
                     const progressData = JSON.parse(data);
@@ -515,7 +609,6 @@
                             maxDuplicateMap.value[key] = entry.question.repeatNumber;
                         }
                     });
-                    // Ustaw timer, aby kontynuował od zapisanej wartości (elapsedTime w sekundach)
                     if (timerInterval) {
                         clearInterval(timerInterval);
                         timerInterval = null;
@@ -529,7 +622,9 @@
                 }
             };
 
+            // -----------------------------------
             // Zatrzymywanie timera, gdy quiz się kończy
+            // -----------------------------------
             watch(
                 () => (pendingQuestions.value.length === 0 && currentDisplayIndex.value === history.value.length),
                 (finished) => {
@@ -540,23 +635,46 @@
                 }
             );
 
-            // Przy starcie – sprawdź, czy istnieje zapisany postęp
-            onMounted(() => {
-                loadQuestions();
-                const savedProgress = localStorage.getItem("quizProgress");
+            // -----------------------------------
+            // OnMounted – ładowanie pytań, wczytywanie postępu (dla aktualnego testu)
+            // oraz obsługa zamykania okna (Electron)
+            // -----------------------------------
+            onMounted(async () => {
+                await loadQuestions();
+                const key = `quizProgress_${testName.value}`;
+                const savedProgress = localStorage.getItem(key);
                 if (savedProgress) {
-                    if (window.confirm("Wykryto zapisany postęp testu. Czy chcesz go wczytać?")) {
-                        loadProgress(savedProgress);
-                    } else {
-                        localStorage.removeItem("quizProgress");
-                    }
+                    showCustomPopup(
+                        'confirm',
+                        'Zapisany postęp',
+                        'Wykryto zapisany postęp testu. Czy chcesz go wczytać?',
+                        () => { loadProgress(savedProgress); },
+                        () => { /* Użytkownik odrzucił wczytanie – pozostawiamy zapis */ }
+                    );
                 }
-                // beforeunload – ustawienie e.returnValue wyświetli natywny komunikat przeglądarki
-                window.addEventListener("beforeunload", (e) => {
-                    if (!progressSaved.value && (history.value.length > 0 || selectedAnswers.value.length > 0)) {
-                        e.returnValue = "Masz niezapisany postęp testu. Czy chcesz zapisać postęp?";
-                    }
-                });
+
+                // Obsługa zamykania okna – w Electronie
+                if (window.electronAPI && window.electronAPI.onWindowClose) {
+                    window.electronAPI.onWindowClose((event) => {
+                        if (!progressSaved.value && (history.value.length > 0 || pendingQuestions.value.length > 0)) {
+                            event.preventDefault();
+                            showCustomPopup(
+                                'confirm',
+                                'Niezapisany postęp',
+                                'Masz niezapisany postęp testu. Czy chcesz zapisać postęp przed zamknięciem?',
+                                () => {
+                                    saveProgress();
+                                    window.electronAPI.closeWindow();
+                                },
+                                () => {
+                                    window.electronAPI.closeWindow();
+                                }
+                            );
+                        } else {
+                            window.electronAPI.closeWindow();
+                        }
+                    });
+                }
             });
 
             return {
@@ -599,14 +717,17 @@
                 currentZoomedImage,
                 zoomImage,
                 closeZoom,
-                saveProgress
+                saveProgress,
+                loadProgress,
+                customPopup,
+                customPopupConfirm,
+                customPopupCancel
             };
         }
     };
 </script>
 
 <style scoped>
-
     /* Nowy styl dla wyświetlania nazwy pliku z aktualnym pytaniem */
     .file-info {
         font-size: 0.8rem;
@@ -984,8 +1105,10 @@
         }
 
     .popup-buttons {
+        margin-top: 1rem;
         display: flex;
         justify-content: center;
+        gap: 1rem;
     }
 
     .explanation-popup {
@@ -1044,6 +1167,42 @@
     }
 
         .save-progress-btn:hover {
+            transform: translateY(-2px);
+        }
+
+    /* Style dla custom popup */
+    .custom-popup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1500;
+    }
+
+    .custom-popup-content {
+        background: #1a1a1a;
+        padding: 2rem;
+        border-radius: 8px;
+        width: 300px;
+        text-align: center;
+        color: #fff;
+    }
+
+    .popup-btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        background: linear-gradient(135deg, #2196f3, #1976d2);
+        color: #fff;
+        cursor: pointer;
+    }
+
+        .popup-btn:hover {
             transform: translateY(-2px);
         }
 </style>
