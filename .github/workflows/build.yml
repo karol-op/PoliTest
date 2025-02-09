@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - 'v*'  # Uruchamia się, gdy pushujesz tagi wersji, np. "v1.0.0"
-
+  workflow_dispatch:  # Umożliwia ręczne uruchomienie workflow
 jobs:
   build:
     runs-on: windows-latest  # Używamy Windowsa do budowania exe
