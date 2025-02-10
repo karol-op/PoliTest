@@ -49,13 +49,13 @@
                 <!-- Lista odpowiedzi -->
                 <div class="answers-section">
                     <ul>
-                        <li v-for="(answer, index) in displayedQuestion.answers" :key="index" class="answer-item">
+                        <li v-for="(answer, index) in shuffledAnswers" :key="index" class="answer-item">
                             <div class="answer-wrapper">
                                 <button @click="selectAnswer(answer)"
                                         :class="[ isSelected(answer) ? 'selected' : '',
-                                  { correct: inReviewMode && isSelected(answer) && answer.correct,
-                                    missed: inReviewMode && !isSelected(answer) && answer.correct,
-                                    incorrect: inReviewMode && isSelected(answer) && !answer.correct } ]"
+                          { correct: inReviewMode && isSelected(answer) && answer.correct,
+                            missed: inReviewMode && !isSelected(answer) && answer.correct,
+                            incorrect: inReviewMode && isSelected(answer) && !answer.correct } ]"
                                         :disabled="inReviewMode"
                                         class="answer-btn">
                                     {{ answer.text }}
@@ -70,6 +70,7 @@
                         </li>
                     </ul>
                 </div>
+
 
                 <div class="confirmation">
                     <button v-if="history.length > 0 && currentDisplayIndex > 0" @click="goBack" class="back-btn">←</button>
@@ -441,6 +442,19 @@
             };
 
             // -----------------------------------
+            // Losowe mieszanie odpowiedzi – dla bieżącego pytania
+            // -----------------------------------
+            const shuffledAnswers = ref([]);
+            watch(displayedQuestion, (newQuestion) => {
+                if (newQuestion && newQuestion.answers && Array.isArray(newQuestion.answers)) {
+                    // Ustawiamy losową kolejność odpowiedzi przy zmianie pytania
+                    shuffledAnswers.value = shuffleArray(newQuestion.answers);
+                } else {
+                    shuffledAnswers.value = [];
+                }
+            }, { immediate: true });
+
+            // -----------------------------------
             // Obsługa wyboru odpowiedzi – tylko dla bieżącego pytania
             // -----------------------------------
             const selectAnswer = (answer) => {
@@ -737,11 +751,14 @@
                 loadProgress,
                 customPopup,
                 customPopupConfirm,
-                customPopupCancel
+                customPopupCancel,
+                // Dodany nowy ref z losowo uporządkowanymi odpowiedziami
+                shuffledAnswers
             };
         }
     };
 </script>
+
 
 <style scoped>
     /* Nowy styl dla wyświetlania nazwy pliku z aktualnym pytaniem */
