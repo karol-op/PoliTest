@@ -7,6 +7,7 @@
 
         <section class="folder-selection">
             <h2>Wybierz foldery źródłowe</h2>
+            <h4>(skąd będą kopiowane pliki)</h4>
             <ul>
                 <li v-for="(folder, index) in sourceFolders" :key="folder">
                     <span class="folder-name">{{ folder }}</span>
@@ -18,6 +19,7 @@
 
         <section class="target-folder">
             <h2>Wybierz folder docelowy</h2>
+            <h4>(dokąd będą kopiowane pliki)</h4>
             <p v-if="targetFolder" class="selected-folder">
                 Wybrany folder: <strong>{{ targetFolder }}</strong>
             </p>

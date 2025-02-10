@@ -126,7 +126,7 @@
                 <h2>Ustawienia quizu</h2>
                 <label>Dodatkowe powtórzenia przy błędnej odpowiedzi:</label>
                 <input type="number" v-model.number="additionalRepetitions" min="0" />
-                <label>Wstępne powtórzenia:</label>
+                <label>Wstępne powtórzenia: (zmiana zostanie zastosowana dopiero przy następnym restarcie quizu)</label>
                 <input type="number" v-model.number="initialRepetitions" min="1" />
                 <label>Maksymalna liczba powtórzeń:</label>
                 <input type="number" v-model.number="maximumRepetitions" min="1" />
@@ -335,7 +335,7 @@
                     const result = await window.electronAPI.listFiles(folder);
                     if (result.success) {
                         const txtFiles = result.files.filter(file =>
-                            file.endsWith(".txt") && file.toLowerCase() !== "testname.txt"
+                            file.endsWith(".txt") && !file.toLowerCase().startsWith("testname")
                         );
                         totalQuestions.value = txtFiles.length;
                         const loadedQuestions = [];
