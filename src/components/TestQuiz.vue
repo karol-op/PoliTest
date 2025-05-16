@@ -58,7 +58,14 @@
                             incorrect: inReviewMode && isSelected(answer) && !answer.correct } ]"
                                         :disabled="inReviewMode"
                                         class="answer-btn">
-                                    {{ answer.text }}
+                                    <div class="answer-content">
+                                        <img v-if="answer.image"
+                                             :src="answer.image"
+                                             @click.stop="zoomImage(answer.image)"
+                                             alt="Obrazek odpowiedzi"
+                                             class="answer-image" />
+                                        {{ answer.text }}
+                                    </div>
                                     <span v-if="isSelected(answer)" class="checkmark">✓</span>
                                 </button>
                                 <button v-if="inReviewMode && answer.explanation"
@@ -240,6 +247,7 @@
 
             // Tablice pytań
             const pendingQuestions = ref([]);
+            const loadedQuestions = ref([]);
             const history = ref([]);
             // Wybrane odpowiedzi dla bieżącego pytania
             const selectedAnswers = ref([]);
@@ -247,6 +255,9 @@
             const startTime = ref(null);
             const elapsedTime = ref(0);
             let timerInterval = null;
+
+            // Mapa powtórzeń
+            const repetitionsMap = ref({});
 
             // Flaga, czy postęp został zapisany
             const progressSaved = ref(false);
@@ -297,26 +308,11 @@
                 explanationPopupVisible.value = false;
             };
 
-            // -----------------------------------
-            // Mapa powtórzeń – po wczytaniu stanu będziemy ją przebudowywać
-            // -----------------------------------
-            const maxDuplicateMap = ref({});
-
-            // Obliczanie opanowanych pytań – przyjmujemy, że klucz to questionId
+            // Obliczanie opanowanych pytań
             const masteredQuestions = computed(() => {
-                let count = 0;
-                for (const key in maxDuplicateMap.value) {
-                    // Filtrujemy historię według questionId
-                    const entries = history.value.filter(entry => entry.question.questionId === key);
-                    const finalEntry = entries.reduce((prev, current) =>
-                        (!prev || current.question.repeatNumber > prev.question.repeatNumber) ? current : prev, null);
-                    // Szukamy w kolejce (pendingQuestions) instancji z tym samym questionId
-                    const pendingForQuestion = pendingQuestions.value.filter(q => q.questionId === key);
-                    if (finalEntry && finalEntry.correct && pendingForQuestion.length === 0) {
-                        count++;
-                    }
-                }
-                return count;
+                return loadedQuestions.value.reduce((count, q) => {
+                    return count + (repetitionsMap.value[q.questionId] === 0 ? 1 : 0);
+                }, 0);
             });
             const masteredPercentage = computed(() =>
                 totalQuestions.value > 0 ? (masteredQuestions.value / totalQuestions.value) * 100 : 0
@@ -338,27 +334,29 @@
                             file.endsWith(".txt") && !file.toLowerCase().startsWith("testname")
                         );
                         totalQuestions.value = txtFiles.length;
-                        const loadedQuestions = [];
+                        const parsedQuestions = [];
                         for (const fileName of txtFiles) {
                             const res = await window.electronAPI.readFile({ folder, fileName });
                             if (res.success) {
                                 const qObj = parseQuestion(res.content, fileName);
                                 if (qObj) {
-                                    loadedQuestions.push(qObj);
+                                    parsedQuestions.push(qObj);
                                 }
                             }
                         }
-                        if (loadedQuestions.length === 0) {
+                        if (parsedQuestions.length === 0) {
                             error.value = "Brak pytań w folderze.";
                         } else {
-                            let initialQueue = [];
-                            loadedQuestions.forEach(q => {
-                                // Używamy questionId
-                                maxDuplicateMap.value[q.questionId] = initialRepetitions.value;
-                                for (let i = 1; i <= initialRepetitions.value; i++) {
-                                    initialQueue.push({ ...q, repeatNumber: i });
-                                }
+                            loadedQuestions.value = parsedQuestions;
+                            parsedQuestions.forEach(q => {
+                                repetitionsMap.value[q.questionId] = initialRepetitions.value;
                             });
+                            const initialQueue = parsedQuestions.flatMap(q =>
+                                Array.from({ length: initialRepetitions.value }, (_, i) => ({
+                                    ...q,
+                                    instanceNumber: i + 1
+                                }))
+                            );
                             pendingQuestions.value = shuffleArray(initialQueue);
                             const testNameResult = await window.electronAPI.readFile({ folder, fileName: "testname.txt" });
                             if (testNameResult.success) {
@@ -390,7 +388,6 @@
                     offset = 2;
                 }
                 const questionText = lines[offset];
-                // Obliczamy questionId jako kombinację nazwy pliku i treści pytania
                 const questionId = `${fileName}:${questionText}`;
                 let questionExplanation = null;
                 let answerLines = [];
@@ -406,15 +403,27 @@
                 while (i < answerLines.length && bitIndex < bits.length) {
                     const answerText = answerLines[i];
                     let answerExplanation = null;
-                    if (answerLines[i + 1] && answerLines[i + 1].startsWith("[exp]") && answerLines[i + 1].endsWith("[/exp]")) {
+                    let answerImage = null;
+
+                    // Sprawdzenie czy następna linia to obrazek
+                    if (i + 1 < answerLines.length && answerLines[i + 1].startsWith("[img]") && answerLines[i + 1].endsWith("[/img]")) {
+                        const imgFileName = answerLines[i + 1].substring(5, answerLines[i + 1].length - 6);
+                        answerImage = folder + "/" + imgFileName;
+                        i++; // Przeskocz linijkę z obrazkiem
+                    }
+
+                    // Sprawdź czy następna linia to wyjaśnienie
+                    if (i + 1 < answerLines.length && answerLines[i + 1].startsWith("[exp]") && answerLines[i + 1].endsWith("[/exp]")) {
                         answerExplanation = answerLines[i + 1].substring(5, answerLines[i + 1].length - 6);
-                        i += 2;
+                        i += 2; // Przeskocz linijkę z wyjaśnieniem
                     } else {
                         i++;
                     }
+
                     answers.push({
                         text: answerText,
                         explanation: answerExplanation,
+                        image: answerImage,
                         correct: bits[bitIndex] === "1"
                     });
                     bitIndex++;
@@ -425,7 +434,7 @@
                     image,
                     answers,
                     fileName,
-                    questionId // Dodajemy właściwość questionId
+                    questionId
                 };
             };
 
@@ -447,7 +456,6 @@
             const shuffledAnswers = ref([]);
             watch(displayedQuestion, (newQuestion) => {
                 if (newQuestion && newQuestion.answers && Array.isArray(newQuestion.answers)) {
-                    // Ustawiamy losową kolejność odpowiedzi przy zmianie pytania
                     shuffledAnswers.value = shuffleArray(newQuestion.answers);
                 } else {
                     shuffledAnswers.value = [];
@@ -495,30 +503,27 @@
                     correct: isCorrect
                 });
 
+                const questionId = currentQuestion.questionId;
+
                 if (isCorrect) {
-                    // Przy poprawnej odpowiedzi usuwamy tylko bieżącą instancję pytania.
-                    pendingQuestions.value.shift();
+                    repetitionsMap.value[questionId] = Math.max(repetitionsMap.value[questionId] - 1, 0);
                 } else {
-                    const currentRepeat = currentQuestion.repeatNumber || 1;
-                    let copies = additionalRepetitions.value + 1;
-                    const available = maximumRepetitions.value - currentRepeat;
-                    if (copies > available) copies = available;
-                    for (let i = 1; i <= copies; i++) {
-                        const newRepeat = currentRepeat + i;
-                        if (newRepeat > maximumRepetitions.value) break;
-                        pendingQuestions.value.push({
-                            ...currentQuestion,
-                            repeatNumber: newRepeat
-                        });
-                        // Używamy questionId do aktualizacji mapy powtórzeń
-                        const key = currentQuestion.questionId;
-                        if (!maxDuplicateMap.value[key] || maxDuplicateMap.value[key] < newRepeat) {
-                            maxDuplicateMap.value[key] = newRepeat;
-                        }
-                    }
-                    pendingQuestions.value.shift();
-                    pendingQuestions.value = shuffleArray(pendingQuestions.value);
+                    repetitionsMap.value[questionId] = Math.min(
+                        repetitionsMap.value[questionId] + additionalRepetitions.value,
+                        maximumRepetitions.value
+                    );
                 }
+
+                pendingQuestions.value = shuffleArray(
+                    loadedQuestions.value
+                        .filter(q => repetitionsMap.value[q.questionId] > 0)
+                        .flatMap(q =>
+                            Array.from({ length: repetitionsMap.value[q.questionId] }, (_, i) => ({
+                                ...q,
+                                instanceNumber: i + 1
+                            }))
+                        )
+                );
 
                 selectedAnswers.value = [];
                 currentDisplayIndex.value = history.value.length - 1;
@@ -604,7 +609,7 @@
             };
 
             // -----------------------------------
-            // Zapis postępu – używamy klucza "quizProgress_<testName>"
+            // Zapis postępu
             // -----------------------------------
             const saveProgress = () => {
                 const progressData = {
@@ -612,7 +617,8 @@
                     history: history.value,
                     pendingQuestions: pendingQuestions.value,
                     currentDisplayIndex: currentDisplayIndex.value,
-                    elapsedTime: elapsedTime.value
+                    elapsedTime: elapsedTime.value,
+                    repetitionsMap: repetitionsMap.value
                 };
                 const key = `quizProgress_${testName.value}`;
                 localStorage.setItem(key, JSON.stringify(progressData));
@@ -621,24 +627,28 @@
             };
 
             // -----------------------------------
-            // Wczytywanie postępu – wczytujemy zapisany stan dla aktualnego testu
+            // Wczytywanie postępu
             // -----------------------------------
             const loadProgress = (data) => {
                 try {
                     const progressData = JSON.parse(data);
                     history.value = progressData.history || [];
-                    pendingQuestions.value = progressData.pendingQuestions || [];
                     currentDisplayIndex.value = progressData.currentDisplayIndex || 0;
                     elapsedTime.value = progressData.elapsedTime || 0;
+                    repetitionsMap.value = progressData.repetitionsMap || {};
+
+                    pendingQuestions.value = shuffleArray(
+                        loadedQuestions.value
+                            .filter(q => repetitionsMap.value[q.questionId] > 0)
+                            .flatMap(q =>
+                                Array.from({ length: repetitionsMap.value[q.questionId] }, (_, i) => ({
+                                    ...q,
+                                    instanceNumber: i + 1
+                                }))
+                            )
+                    );
+
                     progressSaved.value = true;
-                    // Przebuduj maxDuplicateMap na podstawie historii
-                    maxDuplicateMap.value = {};
-                    history.value.forEach(entry => {
-                        const key = entry.question.questionId;
-                        if (!maxDuplicateMap.value[key] || entry.question.repeatNumber > maxDuplicateMap.value[key]) {
-                            maxDuplicateMap.value[key] = entry.question.repeatNumber;
-                        }
-                    });
                     if (timerInterval) {
                         clearInterval(timerInterval);
                         timerInterval = null;
@@ -653,21 +663,7 @@
             };
 
             // -----------------------------------
-            // Zatrzymywanie timera, gdy quiz się kończy
-            // -----------------------------------
-            watch(
-                () => (pendingQuestions.value.length === 0 && currentDisplayIndex.value === history.value.length),
-                (finished) => {
-                    if (finished && timerInterval) {
-                        clearInterval(timerInterval);
-                        timerInterval = null;
-                    }
-                }
-            );
-
-            // -----------------------------------
-            // OnMounted – ładowanie pytań, wczytywanie postępu (dla aktualnego testu)
-            // oraz obsługa zamykania okna (Electron)
+            // OnMounted
             // -----------------------------------
             onMounted(async () => {
                 await loadQuestions();
@@ -679,11 +675,10 @@
                         'Zapisany postęp',
                         'Wykryto zapisany postęp testu. Czy chcesz go wczytać?',
                         () => { loadProgress(savedProgress); },
-                        () => { /* Użytkownik odrzucił wczytanie – pozostawiamy zapis */ }
+                        () => { }
                     );
                 }
 
-                // Obsługa zamykania okna – w Electronie
                 if (window.electronAPI && window.electronAPI.onWindowClose) {
                     window.electronAPI.onWindowClose((event) => {
                         if (!progressSaved.value && (history.value.length > 0 || pendingQuestions.value.length > 0)) {
@@ -752,16 +747,33 @@
                 customPopup,
                 customPopupConfirm,
                 customPopupCancel,
-                // Dodany nowy ref z losowo uporządkowanymi odpowiedziami
                 shuffledAnswers
             };
         }
     };
 </script>
 
-
 <style scoped>
-    /* Nowy styl dla wyświetlania nazwy pliku z aktualnym pytaniem */
+    .answer-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .answer-image {
+        max-width: 150px;
+        max-height: 100px;
+        object-fit: contain;
+        border-radius: 4px;
+        cursor: zoom-in;
+        transition: transform 0.2s;
+    }
+
+        .answer-image:hover {
+            transform: scale(1.05);
+        }
+
     .file-info {
         font-size: 0.8rem;
         color: #aaa;

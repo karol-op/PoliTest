@@ -11,7 +11,6 @@
                 </li>
             </ul>
             <p v-else class="no-files">Brak plików w folderze</p>
-            <!-- Przyciski "Nowy plik" oraz "Usuń plik" - umieszczone na dole sekcji plików -->
             <div class="file-actions">
                 <button v-if="currentFileName" @click="resetCurrentFile" class="new-file-btn">
                     Nowy plik
@@ -27,7 +26,6 @@
             <div class="test-name-header">
                 <h1>Tworzenie pytań</h1>
                 <h2 class="test-name">
-                    <!-- Kliknięcie tylko na span powoduje przejście w tryb edycji -->
                     <span v-if="!editingTestName" @click="toggleEditTestName">
                         {{ storedTestName }}
                     </span>
@@ -67,17 +65,15 @@
 
             <!-- Formularz pytania -->
             <form @submit.prevent="handleSubmit">
-                <!-- Kontener dla pola pytania (relative, by umieścić przycisk wewnątrz) -->
                 <div class="form-group question-group input-container">
-<textarea v-model.trim="currentQuestion"
-          placeholder="Wpisz swoje pytanie"
-          required
-          rows="3"
-          class="question-input"
-          :class="{ 'input-error': showErrors && !currentQuestion }"
-          @keydown.enter.prevent
-          @input="sanitizeInput('currentQuestion')"></textarea>
-
+                    <textarea v-model.trim="currentQuestion"
+                              placeholder="Wpisz swoje pytanie"
+                              required
+                              rows="3"
+                              class="question-input"
+                              :class="{ 'input-error': showErrors && !currentQuestion }"
+                              @keydown.enter.prevent="handleQuestionEnter"
+                              @input="sanitizeInput('currentQuestion')"></textarea>
 
                     <button type="button"
                             class="exp-btn"
@@ -98,7 +94,6 @@
                     </span>
                     <div class="image-preview">
                         <img :src="selectedImage" alt="Podgląd zdjęcia" />
-                        <!-- Kontener przycisków zdjęcia -->
                         <div class="image-actions">
                             <button type="button" @click="chooseImage" class="modify-image-btn" title="Zmień zdjęcie">
                                 🔄
@@ -116,15 +111,15 @@
                     <div v-for="(answer, index) in answers"
                          :key="index"
                          class="answer-item">
-                        <!-- Kontener inputa z przyciskiem explanation -->
                         <div class="answer-input-container">
                             <input type="text"
                                    v-model.trim="answer.text"
                                    placeholder="Wpisz odpowiedź"
                                    class="answer-input"
                                    :class="{ 'input-error': showErrors && !answer.text }"
-                                   @keydown.enter.prevent
-                                   @input="sanitizeAnswer(index)" />
+                                   @keydown="handleAnswerKeys($event, index)"
+                                   @input="sanitizeAnswer(index)"
+                                   :data-answer-index="index" />
                             <button type="button"
                                     class="exp-btn"
                                     @click="openExplanationPopup('answer', index)"
@@ -133,13 +128,22 @@
                                 ?
                             </button>
                         </div>
+
                         <label class="correct-label">
                             <input type="checkbox"
                                    v-model="answer.isCorrect"
                                    class="correct-checkbox" />
                             Poprawna
                         </label>
-                        <!-- Przycisk usuwania odpowiedzi -->
+
+                        <button type="button"
+                                @click="handleAnswerImageAction(index)"
+                                class="image-answer-btn"
+                                :class="{ 'has-image': answer.image }"
+                                :title="answer.image ? 'Akcje dla zdjęcia' : 'Dodaj zdjęcie do odpowiedzi'">
+                            {{ answer.image ? '⚙️' : '📷' }}
+                        </button>
+
                         <button v-if="answers.length > 1"
                                 @click="confirmRemove(index)"
                                 class="remove-btn"
@@ -193,6 +197,28 @@
             </div>
         </div>
 
+        <!-- Nowy popup akcji zdjęciowych -->
+        <div v-if="imageActionPopup.show" class="explanation-popup-overlay">
+            <div class="explanation-popup">
+                <h3>Wybierz akcję dla zdjęcia</h3>
+                <div class="popup-actions column">
+                    <button @click="showImagePreview" class="popup-save-btn">Podgląd</button>
+                    <button @click="changeImage" class="popup-save-btn">Zmień zdjęcie</button>
+                    <button @click="removeImageAction" class="popup-cancel-btn">Usuń zdjęcie</button>
+                    <button @click="closeImageActionPopup" class="popup-cancel-btn">Anuluj</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Popup podglądu zdjęcia -->
+        <div v-if="imagePreviewPopup.show" class="explanation-popup-overlay">
+            <div class="explanation-popup">
+                <h3>Podgląd zdjęcia</h3>
+                <img :src="imagePreviewPopup.imagePath" class="image-preview-popup" />
+                <button @click="closeImagePreview" class="popup-cancel-btn">Zamknij</button>
+            </div>
+        </div>
+
         <!-- Confirmation Popup -->
         <div v-if="confirmationPopup.show" class="confirmation-popup-overlay">
             <div class="confirmation-popup">
@@ -225,7 +251,7 @@
             return {
                 currentQuestion: "",
                 questionExplanation: "",
-                answers: [{ text: "", isCorrect: false, explanation: "" }],
+                answers: [{ text: "", isCorrect: false, explanation: "", image: null }],
                 showErrors: false,
                 addAnswerError: null,
                 addAnswerPending: false,
@@ -248,6 +274,16 @@
                     message: "",
                     callback: null,
                 },
+                imageActionPopup: {
+                    show: false,
+                    index: null,
+                    type: null,
+                    imagePath: null
+                },
+                imagePreviewPopup: {
+                    show: false,
+                    imagePath: null
+                }
             };
         },
         computed: {
@@ -277,11 +313,9 @@
             },
         },
         mounted() {
-            // Jeśli z query przekazano testName, ustawiamy go
             if (this.route.query.testName) {
                 this.testName = this.route.query.testName;
             }
-            // Jeśli z query przekazano folder, ustawiamy selectedFolder i ładujemy pliki oraz (jeśli testName nie został przekazany) odczytujemy nazwę testu z pliku testname.txt
             if (this.route.query.folder) {
                 this.selectedFolder = decodeURIComponent(this.route.query.folder);
                 this.fetchFiles();
@@ -301,33 +335,85 @@
                     });
                 }
             }
-            // Rejestracja globalnego listenera do skrótu klawiszowego (Ctrl+D)
             window.addEventListener("keydown", this.handleKeyDown);
         },
         beforeDestroy() {
-            // Usunięcie listenera przy niszczeniu komponentu
             window.removeEventListener("keydown", this.handleKeyDown);
         },
         methods: {
+            openImageActionPopup(index, type) {
+                if (type === 'main') {
+                    this.imageActionPopup = {
+                        show: true,
+                        index: null,
+                        type: 'main',
+                        imagePath: this.selectedImage
+                    };
+                } else {
+                    this.imageActionPopup = {
+                        show: true,
+                        index: index,
+                        type: 'answer',
+                        imagePath: this.answers[index].image
+                    };
+                }
+            },
+            handleAnswerImageAction(index) {
+                if (this.answers[index].image) {
+                    this.openImageActionPopup(index, 'answer');
+                } else {
+                    this.chooseAnswerImage(index);
+                }
+            },
+            showImagePreview() {
+                this.imagePreviewPopup = {
+                    show: true,
+                    imagePath: this.imageActionPopup.imagePath
+                };
+                this.closeImageActionPopup();
+            },
+            changeImage() {
+                if (this.imageActionPopup.type === 'main') {
+                    this.chooseImage();
+                } else {
+                    this.chooseAnswerImage(this.imageActionPopup.index);
+                }
+                this.closeImageActionPopup();
+            },
+            removeImageAction() {
+                if (this.imageActionPopup.type === 'main') {
+                    this.removeImage();
+                } else {
+                    this.answers[this.imageActionPopup.index].image = null;
+                    this.showNotification("Zdjęcie odpowiedzi usunięte", "success");
+                }
+                this.closeImageActionPopup();
+            },
+            closeImageActionPopup() {
+                this.imageActionPopup = {
+                    show: false,
+                    index: null,
+                    type: null,
+                    imagePath: null
+                };
+            },
+            closeImagePreview() {
+                this.imagePreviewPopup = {
+                    show: false,
+                    imagePath: null
+                };
+            },
+            getImageFileName(path) {
+                if (!path) return "";
+                const parts = path.split(/[\\/]/);
+                return parts[parts.length - 1];
+            },
             sanitizeInput(field) {
-                // Usuwamy wszystkie wystąpienia znaków nowej linii (LF i CR)
                 this[field] = this[field].replace(/[\r\n]+/g, ' ');
             },
-
             sanitizeAnswer(index) {
                 this.answers[index].text = this.answers[index].text.replace(/[\r\n]+/g, ' ');
             },
-
-            // Nowa metoda do sanitizacji wyjaśnień (dla pytania)
-            sanitizeExplanation(field) {
-                this[field] = this[field].replace(/[\r\n]+/g, ' ');
-            },
-
-            // Nowa metoda do sanitizacji wyjaśnień (dla odpowiedzi)
-            sanitizeAnswerExplanation(index) {
-                this.answers[index].explanation = this.answers[index].explanation.replace(/[\r\n]+/g, ' ');
-            },
-
             sanitize(text) {
                 return text
                     .normalize("NFD")
@@ -424,6 +510,13 @@
                         const answerText = lines[offset].trim();
                         offset++;
                         let exp = "";
+                        let img = null;
+                        if (offset < lines.length && lines[offset].startsWith("[img]") && lines[offset].endsWith("[/img]")) {
+                            const imgLine = lines[offset].trim();
+                            const imgFileName = imgLine.substring(5, imgLine.length - 6);
+                            img = this.selectedFolder + "/" + imgFileName;
+                            offset++;
+                        }
                         if (offset < lines.length && lines[offset].startsWith("[exp]") && lines[offset].endsWith("[/exp]")) {
                             exp = lines[offset].slice(5, -6);
                             offset++;
@@ -432,6 +525,7 @@
                             text: answerText,
                             isCorrect: bits[answerIndex] === "1",
                             explanation: exp,
+                            image: img,
                         });
                         answerIndex++;
                     }
@@ -459,6 +553,18 @@
                 this.selectedImage = null;
                 this.showNotification("Zdjęcie usunięte", "success");
             },
+            async chooseAnswerImage(index) {
+                try {
+                    const imagePath = await window.electronAPI.selectImage();
+                    if (imagePath) {
+                        this.answers[index].image = imagePath;
+                        this.showNotification("Zdjęcie dodane do odpowiedzi", "success");
+                    }
+                } catch (error) {
+                    console.error("Błąd przy wybieraniu zdjęcia:", error);
+                    this.showNotification("Błąd przy wybieraniu zdjęcia odpowiedzi", "error");
+                }
+            },
             async handleSubmit() {
                 if (!this.validateForm()) return;
                 if (!this.selectedFolder) {
@@ -467,8 +573,6 @@
                 }
                 const correctMarker = "X" + this.answers.map((a) => (a.isCorrect ? "1" : "0")).join("");
 
-                // Jeśli edytujemy istniejący plik, zachowujemy jego nazwę.
-                // W przeciwnym razie generujemy nazwę na podstawie pierwszych 20 znaków pytania.
                 let fileName;
                 if (this.currentFileName) {
                     fileName = this.currentFileName;
@@ -476,7 +580,6 @@
                     let baseName = this.sanitize(this.currentQuestion).substring(0, 20) || "pytanie";
                     fileName = baseName + ".txt";
                     let counter = 2;
-                    // Jeśli plik o tej nazwie już istnieje, dodajemy sufiks _vX
                     while (this.files.includes(fileName)) {
                         fileName = `${baseName}_v${counter}.txt`;
                         counter++;
@@ -494,6 +597,9 @@
                 }
                 this.answers.forEach((a) => {
                     contentLines.push(a.text.trim());
+                    if (a.image) {
+                        contentLines.push("[img]" + this.getImageFileName(a.image) + "[/img]");
+                    }
                     if (a.explanation.trim() !== "") {
                         contentLines.push("[exp]" + a.explanation.trim() + "[/exp]");
                     }
@@ -519,20 +625,26 @@
                     return;
                 }
 
+                const copyPromises = [];
                 if (this.selectedImage) {
                     try {
                         const destination = this.selectedFolder + "/" + this.imageFileName;
-                        const copyResult = await window.electronAPI.copyFile(
-                            this.selectedImage,
-                            destination
-                        );
-                        if (!copyResult.success) {
-                            this.showNotification("Pytanie zapisane, ale nie udało się skopiować zdjęcia", "error");
-                        }
+                        copyPromises.push(window.electronAPI.copyFile(this.selectedImage, destination));
                     } catch (error) {
                         console.error("Błąd podczas kopiowania zdjęcia:", error);
                     }
                 }
+
+                this.answers.forEach((a) => {
+                    if (a.image) {
+                        const destination = this.selectedFolder + "/" + this.getImageFileName(a.image);
+                        copyPromises.push(window.electronAPI.copyFile(a.image, destination).catch(error => {
+                            console.error("Błąd podczas kopiowania zdjęcia odpowiedzi:", error);
+                        }));
+                    }
+                });
+
+                await Promise.all(copyPromises);
 
                 try {
                     const testNameResult = await window.electronAPI.saveFile({
@@ -561,7 +673,11 @@
                     }, 3000);
                     return;
                 }
-                this.answers.push({ text: "", isCorrect: false, explanation: "" });
+
+                this.answers.push({ text: "", isCorrect: false, explanation: "", image: null });
+                this.$nextTick(() => {
+                    this.focusAnswer(this.answers.length - 1);
+                });
                 this.addAnswerError = null;
                 this.addAnswerPending = false;
             },
@@ -586,7 +702,7 @@
             resetForm() {
                 this.currentQuestion = "";
                 this.questionExplanation = "";
-                this.answers = [{ text: "", isCorrect: false, explanation: "" }];
+                this.answers = [{ text: "", isCorrect: false, explanation: "", image: null }];
                 this.showErrors = false;
             },
             resetCurrentFile() {
@@ -626,7 +742,6 @@
                 this.explanationPopup.show = true;
             },
             saveExplanation() {
-                // Zamieniamy enter (znaki nowej linii) na spację przed zapisaniem wyjaśnienia
                 this.popupExplanationText = this.popupExplanationText.replace(/[\r\n]+/g, ' ');
                 if (this.explanationPopup.type === "question") {
                     this.questionExplanation = this.popupExplanationText;
@@ -665,17 +780,57 @@
                     this.notification = null;
                 }, 3000);
             },
-            // Nowa metoda obsługująca skrót klawiszowy Ctrl+D
+            handleQuestionEnter(e) {
+                if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
+                    this.addAnswer();
+                }
+            },
+            handleAnswerKeys(e, index) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.focusAnswer(index + 1);
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.focusAnswer(index - 1);
+                }
+
+                if (e.ctrlKey && /^(?:Digit|Numpad)[1-9]$/.test(e.code)) {
+                    e.preventDefault();
+                    const num = parseInt(e.code.match(/[1-9]/)[0]);
+                    const answerIndex = num - 1;
+                    if (answerIndex < this.answers.length) {
+                        this.answers[answerIndex].isCorrect = !this.answers[answerIndex].isCorrect;
+                        this.$forceUpdate();
+                    }
+                }
+
+                if (e.ctrlKey && e.key === 'Backspace' && !this.answers[index].text.trim()) {
+                    e.preventDefault();
+                    this.confirmRemove(index);
+                }
+            },
+            focusAnswer(index) {
+                const inputs = document.querySelectorAll('.answer-input');
+                if (index >= 0 && index < inputs.length) {
+                    inputs[index].focus();
+                    inputs[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            },
             handleKeyDown(event) {
-                if (event.ctrlKey && event.key.toLowerCase() === "d") {
+                if (event.ctrlKey && event.key.toLowerCase() === 'd') {
                     event.preventDefault();
                     this.addAnswer();
                 }
-            }
+
+                if (event.ctrlKey && event.key === 'Enter') {
+                    event.preventDefault();
+                    this.handleSubmit();
+                }
+            },
         },
     };
 </script>
-
 
 <style scoped>
     .image-actions {
@@ -707,13 +862,6 @@
             background: #36a174;
         }
 
-    .image-remove-btn {
-        position: static;
-        transform: none;
-        margin: 0;
-    }
-
-    /* Zmodyfikowany przycisk do wprowadzania explanations – przesunięty do wewnątrz inputu */
     .exp-btn {
         background: none;
         border: none;
@@ -767,7 +915,7 @@
         background: #505050;
         padding: 1rem 1.5rem;
         border-radius: 8px;
-        width: 300px;
+        width: 500px;
         text-align: center;
     }
 
@@ -785,6 +933,10 @@
         gap: 5px;
         margin-top: 0.5rem;
     }
+
+        .popup-actions.column {
+            flex-direction: column;
+        }
 
     .popup-save-btn,
     .popup-cancel-btn {
@@ -998,6 +1150,11 @@
         text-align: center;
     }
 
+        .question-input:focus {
+            outline: 2px solid #2196F3;
+            box-shadow: 0 0 5px rgba(33, 150, 243, 0.5);
+        }
+
     .image-preview-section {
         margin: 1rem 0;
         text-align: center;
@@ -1015,13 +1172,6 @@
             border-radius: 4px;
         }
 
-    .image-remove-btn {
-        position: absolute;
-        top: 50%;
-        right: 5px;
-        transform: translateY(-50%);
-    }
-
     .answers-section {
         margin: 2rem 0;
     }
@@ -1030,6 +1180,7 @@
         display: flex;
         align-items: center;
         margin-bottom: 1rem;
+        gap: 0.5rem;
     }
 
     .answer-input {
@@ -1040,12 +1191,16 @@
         text-align: center;
     }
 
+        .answer-input:focus {
+            outline: 2px solid #42b983;
+            box-shadow: 0 0 5px rgba(66, 185, 131, 0.5);
+        }
+
     .correct-label {
         display: flex;
         align-items: center;
         gap: 0.5rem;
         white-space: nowrap;
-        margin-left: 3rem;
     }
 
     .input-error {
@@ -1090,12 +1245,17 @@
         border-radius: 6px;
         cursor: pointer;
         width: 30px;
+        height: 30px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-left: 1.5rem;
     }
-
+    .image-remove-btn {
+        position: static;
+        transform: none;
+        margin: 0;
+        height: 40px;
+    }
     .notification {
         position: fixed;
         bottom: 20px;
@@ -1140,7 +1300,6 @@
             transform: scale(1.05);
         }
 
-    /* Confirmation Popup Styles */
     .confirmation-popup-overlay {
         position: fixed;
         top: 0;
@@ -1160,5 +1319,33 @@
         border-radius: 8px;
         width: 300px;
         text-align: center;
+    }
+
+    .correct-checkbox {
+        margin-left: 35px;
+    }
+
+    .image-answer-btn {
+        background: #42b983;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+        .image-answer-btn.has-image {
+            background: #42b983;
+        }
+
+    .image-preview-popup {
+        max-width: 500px;
+        max-height: 70vh;
+        margin: 20px 0;
+        border-radius: 8px;
     }
 </style>
