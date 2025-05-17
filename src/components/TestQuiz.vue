@@ -19,6 +19,54 @@
             <div v-else-if="pendingQuestions.length === 0 && currentDisplayIndex === history.length">
                 <h2>Quiz zakończony! 🍺</h2>
                 <p>Twój wynik: {{ score }} / {{ history.length }}</p>
+
+                <div class="stats-container">
+                    <div class="stat-box">
+                        <h3>Podstawowe statystyki</h3>
+                        <p>Średni czas na pytanie: {{ averageTimePerQuestion }}s</p>
+                        <p>Procent poprawnych odpowiedzi: {{ correctPercentage }}%</p>
+                        <h4>Poziom trudności pytań</h4>
+                        <p>Łatwe: {{ difficultyStats.easy }}</p>
+                        <p>Średnie: {{ difficultyStats.medium }}</p>
+                        <p>Trudne: {{ difficultyStats.hard }}</p>
+                    </div>
+
+                    <div class="stat-box" v-if="topDifficultQuestions.length > 0">
+                        <h3>Najtrudniejsze pytania</h3>
+                        <div v-for="(question, index) in topDifficultQuestions"
+                             :key="index"
+                             class="difficult-question"
+                             @click="openQuestionPopup(question.questionId)">
+                            <p class="question-text">{{ question.questionText }}</p>
+                            <p class="incorrect-count">Błędów: {{ question.incorrectCount }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="showQuestionPopup" class="question-popup" @click.self="showQuestionPopup = false">
+                    <div class="question-popup-content">
+                        <h2>Szczegóły pytania</h2>
+                        <img v-if="selectedQuestion.image"
+                             :src="selectedQuestion.image"
+                             class="popup-image"
+                             @click.stop="zoomImage(selectedQuestion.image)">
+                        <p class="popup-question-text">{{ selectedQuestion.question }}</p>
+                        <div class="popup-answers">
+                            <div v-for="(answer, index) in selectedQuestion.answers"
+                                 :key="index"
+                                 class="popup-answer"
+                                 :class="{ 'correct': answer.correct }">
+                                <div class="answer-content">
+                                    <img v-if="answer.image"
+                                         :src="answer.image"
+                                         class="popup-answer-image"
+                                         @click.stop="zoomImage(answer.image)">
+                                    {{ answer.text }}
+                                </div>
+                            </div>
+                        </div>
+                        <button @click="showQuestionPopup = false" class="close-btn">Zamknij</button>
+                    </div>
+                </div>
                 <button @click="restartQuiz" class="restart-btn">Restart Quiz</button>
             </div>
 
@@ -176,6 +224,60 @@
         name: 'TestQuiz',
         setup() {
             console.log("Setting up TestQuiz component");
+            const showQuestionPopup = ref(false);
+            const selectedQuestion = ref(null);
+            const averageTimePerQuestion = computed(() => {
+                if (history.value.length === 0) return 0;
+                return (elapsedTime.value / history.value.length).toFixed(1);
+            });
+
+            const correctPercentage = computed(() => {
+                if (history.value.length === 0) return 0;
+                return ((score.value / history.value.length) * 100).toFixed(1);
+            });
+
+            const questionStats = computed(() => {
+                const stats = {};
+                history.value.forEach(entry => {
+                    const id = entry.question.questionId;
+                    if (!stats[id]) {
+                        stats[id] = {
+                            questionId: id,
+                            incorrectCount: 0,
+                            questionText: entry.question.question,
+                            initialRepetitions: initialRepetitions.value
+                        };
+                    }
+                    if (!entry.correct) {
+                        stats[id].incorrectCount++;
+                    }
+                });
+                return stats;
+            });
+
+            const topDifficultQuestions = computed(() => {
+                return Object.values(questionStats.value)
+                    .sort((a, b) => b.incorrectCount - a.incorrectCount)
+                    .slice(0, 3);
+            });
+
+            const difficultyStats = computed(() => {
+                const stats = { easy: 0, medium: 0, hard: 0 };
+                Object.values(questionStats.value).forEach(q => {
+                    const threshold = initialRepetitions.value * 2;
+                    if (q.incorrectCount === 0) {
+                        stats.easy++;
+                    } else if (q.incorrectCount >= threshold) {
+                        stats.hard++;
+                    } else {
+                        stats.medium++;
+                    }
+                });
+                return stats;
+            });
+
+
+
 
             // -----------------------------------
             // Mechanizm Custom Popup
@@ -196,6 +298,10 @@
                 customPopup.onConfirm = onConfirm;
                 customPopup.onCancel = onCancel;
                 customPopup.visible = true;
+            };
+            const openQuestionPopup = (questionId) => {
+                selectedQuestion.value = loadedQuestions.value.find(q => q.questionId === questionId);
+                showQuestionPopup.value = true;
             };
 
             const customPopupConfirm = () => {
@@ -450,6 +556,16 @@
                 return newArray;
             };
 
+            // Watcher zatrzymujący timer gdy quiz się zakończy
+            watch(
+                [() => pendingQuestions.value.length, () => currentDisplayIndex.value],
+                ([pendingLen, currentIndex]) => {
+                    if (pendingLen === 0 && currentIndex === history.value.length && timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                }
+            );
             // -----------------------------------
             // Losowe mieszanie odpowiedzi – dla bieżącego pytania
             // -----------------------------------
@@ -747,7 +863,14 @@
                 customPopup,
                 customPopupConfirm,
                 customPopupCancel,
-                shuffledAnswers
+                shuffledAnswers,
+                averageTimePerQuestion,
+                correctPercentage,
+                topDifficultQuestions,
+                difficultyStats,
+                showQuestionPopup,
+                selectedQuestion,
+                openQuestionPopup
             };
         }
     };
@@ -904,7 +1027,7 @@
     }
 
     .question-text {
-        font-size: 1.5rem;
+        font-size: 1rem;
         margin: 1rem 0;
         text-align: center;
         flex: 1;
@@ -1248,6 +1371,125 @@
     }
 
         .popup-btn:hover {
+            transform: translateY(-2px);
+        }
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+
+    .stat-box {
+        background: #2a2a2a;
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: left;
+    }
+
+        .stat-box h3 {
+            color: #2196f3;
+            margin-top: 0;
+            font-size: 1.1rem;
+            border-bottom: 2px solid #444;
+            padding-bottom: 0.5rem;
+        }
+
+    .difficult-question {
+        margin: 1rem 0;
+        padding: 1rem;
+        background: #333;
+        border-radius: 6px;
+    }
+
+    .question-text {
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+
+    .incorrect-count {
+        color: #ff4444;
+        font-size: 0.9rem;
+        margin: 0;
+    }
+    .question-popup {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+    }
+
+    .question-popup-content {
+        background: #1a1a1a;
+        padding: 2rem;
+        border-radius: 8px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        color: white;
+    }
+
+    .popup-image {
+        max-width: 100%;
+        max-height: 300px;
+        margin: 1rem 0;
+        cursor: zoom-in;
+        border-radius: 4px;
+    }
+
+    .popup-question-text {
+        font-size: 1.2rem;
+        margin: 1rem 0;
+    }
+
+    .popup-answers {
+        margin: 1rem 0;
+    }
+
+    .popup-answer {
+        padding: 1rem;
+        margin: 0.5rem 0;
+        border-radius: 4px;
+        background: #333;
+        transition: transform 0.2s;
+    }
+
+        .popup-answer.correct {
+            background: #42b983;
+            border: 2px solid #2ecc71;
+        }
+
+        .popup-answer:hover {
+            transform: translateX(5px);
+        }
+
+    .popup-answer-image {
+        max-width: 150px;
+        max-height: 100px;
+        margin-top: 0.5rem;
+        border-radius: 4px;
+        cursor: zoom-in;
+    }
+
+    .close-btn {
+        margin-top: 1rem;
+        padding: 0.8rem 1.5rem;
+        background: #2196f3;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+        .close-btn:hover {
             transform: translateY(-2px);
         }
 </style>
