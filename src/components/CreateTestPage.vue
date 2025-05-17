@@ -67,7 +67,7 @@
     }
 
     .test-name-input {
-        width: 100%;
+        width: 94%;
         padding: 1rem;
         border: 2px solid #42b983;
         border-radius: 8px;
@@ -131,14 +131,13 @@
     .merging-btn {
         background: linear-gradient(135deg, #4a90e2, #357ab8);
         color: white;
-        padding: 0.75rem 1.5rem; /* zmniejszony padding */
+        padding: 0.75rem 1.5rem;
         border: none;
         border-radius: 8px;
         cursor: pointer;
-        font-size: 0.9rem; /* zmniejszony rozmiar czcionki */
+        font-size: 1rem;
         text-decoration: none;
         transition: all 0.3s ease;
-        /* Wyśrodkowanie tekstu */
         display: inline-flex;
         align-items: center;
         justify-content: center;

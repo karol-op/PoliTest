@@ -476,9 +476,9 @@
             })
             console.log("PDF export result:", result)
             if (result.success) {
-                alert("PDF exported successfully!")
+                alert("PDF wyeksportowany pomyślnie!")
             } else {
-                alert("Failed to export PDF.")
+                alert("Nie udało się wygenerować PDF.")
             }
         } catch (e) {
             console.error("Error during PDF generation:", e)

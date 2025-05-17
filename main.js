@@ -123,7 +123,6 @@ app.whenReady().then(() => {
             const writeStream = fsSync.createWriteStream(savePath);
             doc.pipe(writeStream);
 
-            // Funkcja usuwająca diakrytyki
             const removeDiacritics = (str) => {
                 if (!str) return '';
                 return str

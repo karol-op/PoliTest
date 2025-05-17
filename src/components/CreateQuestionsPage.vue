@@ -49,7 +49,7 @@
                 <div v-else class="selected-folder-container">
                     <div class="selected-folder-display">
                         <p class="selected-folder">
-                            📁 Wybrana lokalizacija: <strong>{{ selectedFolder }}</strong>
+                            📁 Wybrana lokalizacja: <strong>{{ selectedFolder }}</strong>
                         </p>
                         <button @click="changeFolder" class="reload-button" title="Zmień folder">
                             🔄
@@ -76,11 +76,10 @@
                               @input="sanitizeInput('currentQuestion')"></textarea>
 
                     <button type="button"
-                            class="exp-btn"
+                            class="explanation-btn"
                             @click="openExplanationPopup('question')"
-                            :class="{'exp-btn-green': questionExplanation.trim(), 'exp-btn-red': !questionExplanation.trim()}"
-                            title="Dodaj/edytuj wyjaśnienie">
-                        ?
+                            :class="{ 'btn-green': questionExplanation.trim() }">
+                        {{ questionExplanation.trim() ? '?' : '?' }}
                     </button>
                     <span v-if="showErrors && !currentQuestion" class="error-message">
                         Pytanie jest wymagane
@@ -120,21 +119,21 @@
                                    @keydown="handleAnswerKeys($event, index)"
                                    @input="sanitizeAnswer(index)"
                                    :data-answer-index="index" />
-                            <button type="button"
-                                    class="exp-btn"
-                                    @click="openExplanationPopup('answer', index)"
-                                    :class="{'exp-btn-green': answer.explanation.trim(), 'exp-btn-red': !answer.explanation.trim()}"
-                                    title="Dodaj/edytuj wyjaśnienie">
-                                ?
-                            </button>
                         </div>
 
                         <label class="correct-label">
                             <input type="checkbox"
                                    v-model="answer.isCorrect"
                                    class="correct-checkbox" />
-                            Poprawna
+                      
                         </label>
+
+                        <button type="button"
+                                class="explanation-btn"
+                                @click="openExplanationPopup('answer', index)"
+                                :class="{ 'btn-green': answer.explanation.trim() }">
+                            {{ answer.explanation.trim() ? '?' : '?' }}
+                        </button>
 
                         <button type="button"
                                 @click="handleAnswerImageAction(index)"
@@ -427,7 +426,12 @@
                 this.editingTestName = !this.editingTestName;
             },
             goBack() {
-                this.$router.go(-1);
+                this.openConfirmationPopup(
+                    "Czy na pewno chcesz wrócić do menu głównego? Zmiany SĄ zapisane.",
+                    () => {
+                        this.$router.go(-1);
+                    }
+                );
             },
             async selectFolder() {
                 try {
@@ -817,6 +821,7 @@
                     inputs[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             },
+
             handleKeyDown(event) {
                 if (event.ctrlKey && event.key.toLowerCase() === 'd') {
                     event.preventDefault();
@@ -826,6 +831,20 @@
                 if (event.ctrlKey && event.key === 'Enter') {
                     event.preventDefault();
                     this.handleSubmit();
+                }
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'w') {
+                    event.preventDefault();
+                    const focused = document.activeElement;
+
+                    if (focused.classList.contains('question-input')) {
+                        this.openExplanationPopup('question');
+                    }
+                    else if (focused.classList.contains('answer-input')) {
+                        const index = parseInt(focused.dataset.answerIndex);
+                        if (!isNaN(index)) {
+                            this.openExplanationPopup('answer', index);
+                        }
+                    }
                 }
             },
         },
@@ -862,33 +881,44 @@
             background: #36a174;
         }
 
-    .exp-btn {
-        background: none;
+    .explanation-btn {
+        background: #666;
+        color: white;
         border: none;
+        border-radius: 4px;
+        padding: 6px 12px;
         cursor: pointer;
-        font-size: 1rem;
-        padding: 0;
-        position: absolute;
-        right: 10px;
-        top: 10px;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        transition: background-color 0.2s;
     }
 
-    .exp-btn-green {
-        color: #42b983;
-    }
-
-    .exp-btn-red {
-        color: #ff4444;
+    .btn-green {
+        background: #42b983;
     }
 
     .input-container {
         position: relative;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .answer-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+        gap: 10px;
     }
 
     .answer-input-container {
+        flex-grow: 1;
         position: relative;
-        display: inline-block;
-        width: 100%;
+    }
+
+    .correct-label {
+        margin: 0 0px;
+        white-space: nowrap;
     }
 
     .file-actions {
@@ -1052,7 +1082,7 @@
         }
 
     .file-list-section {
-        width: 200px;
+        width: 225px;
         min-height: 600px;
         background: #404040;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -1148,6 +1178,7 @@
         font-size: 1.1rem;
         resize: none;
         text-align: center;
+        flex-grow: 1;
     }
 
         .question-input:focus {
@@ -1176,13 +1207,6 @@
         margin: 2rem 0;
     }
 
-    .answer-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1rem;
-        gap: 0.5rem;
-    }
-
     .answer-input {
         width: 100%;
         padding: 0.8rem;
@@ -1195,13 +1219,6 @@
             outline: 2px solid #42b983;
             box-shadow: 0 0 5px rgba(66, 185, 131, 0.5);
         }
-
-    .correct-label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        white-space: nowrap;
-    }
 
     .input-error {
         border-color: #ff4444 !important;
@@ -1250,12 +1267,14 @@
         align-items: center;
         justify-content: center;
     }
+
     .image-remove-btn {
         position: static;
         transform: none;
         margin: 0;
         height: 40px;
     }
+
     .notification {
         position: fixed;
         bottom: 20px;

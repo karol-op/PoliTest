@@ -210,7 +210,7 @@
                 );
             }
 
-            // Funkcja pomocnicza – sanitizacja tekstu (opcjonalnie)
+
             function sanitize(text) {
                 return text
                     .normalize("NFD")
@@ -229,7 +229,7 @@
                 sourceFolders,
                 targetFolder,
                 testName,
-                mergeStatus: notificationPopupText, // opcjonalnie, jeśli chcesz odwołać się do treści pop-upu
+                mergeStatus: notificationPopupText, 
                 canMerge,
                 addSourceFolder,
                 removeSourceFolder,
@@ -237,7 +237,6 @@
                 mergeFolders,
                 goToMainMenu,
                 sanitize,
-                // Pop-up notyfikacji
                 notificationPopupVisible,
                 notificationPopupText,
                 closeNotification,
@@ -292,7 +291,6 @@
         font-size: 1.5rem;
     }
 
-    /* Sekcja wyboru folderów źródłowych */
     .folder-selection,
     .target-folder,
     .test-name-selection,
