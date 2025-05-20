@@ -26,19 +26,31 @@
                         <p>Średni czas na pytanie: {{ averageTimePerQuestion }}s</p>
                         <p>Procent poprawnych odpowiedzi: {{ correctPercentage }}%</p>
                         <h4>Poziom trudności pytań</h4>
-                        <p>Łatwe: {{ difficultyStats.easy }}</p>
-                        <p>Średnie: {{ difficultyStats.medium }}</p>
-                        <p>Trudne: {{ difficultyStats.hard }}</p>
+                        <p>Łatwe (0 błędów): {{ difficultyStats.easy }}</p>
+                        <p>Średnie (1-{{ difficultyThreshold - 1 }} błędów): {{ difficultyStats.medium }}</p>
+                        <p>Trudne ({{ difficultyThreshold }}+ błędów): {{ difficultyStats.hard }}</p>
                     </div>
 
                     <div class="stat-box" v-if="topDifficultQuestions.length > 0">
                         <h3>Najtrudniejsze pytania</h3>
-                        <div v-for="(question, index) in topDifficultQuestions"
+                        <div v-for="(question, index) in visibleDifficultQuestions"
                              :key="index"
                              class="difficult-question"
                              @click="openQuestionPopup(question.questionId)">
                             <p class="question-text">{{ question.questionText }}</p>
                             <p class="incorrect-count">Błędów: {{ question.incorrectCount }}</p>
+                        </div>
+                        <div class="pagination-controls" :class="{ 'center-single-button': difficultPage === 0 }">
+                            <button v-if="difficultPage > 0"
+                                    @click="difficultPage--"
+                                    class="pagination-btn">
+                                ← Poprzednie 
+                            </button>
+                            <button @click="loadMoreDifficult"
+                                    :disabled="(difficultPage + 1) * 3 >= topDifficultQuestions.length"
+                                    class="pagination-btn">
+                                Następne →
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -217,13 +229,42 @@
 </template>
 
 <script>
-    import { ref, reactive, computed, onMounted, watch } from 'vue';
+    import { ref, reactive, computed, onMounted, watch, onUnmounted } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
 
     export default {
         name: 'TestQuiz',
         setup() {
             console.log("Setting up TestQuiz component");
+
+            const handleKeydown = (e) => {
+                if (e.key >= '1' && e.key <= '9') {
+                    const index = parseInt(e.key) - 1;
+                    if (index < shuffledAnswers.value.length) {
+                        selectAnswer(shuffledAnswers.value[index]);
+                    }
+                }
+                if (e.key === 'Enter' && !inReviewMode.value) {
+                    if (selectedAnswers.value.length > 0) confirmAnswers();
+                }
+                if (e.key === 'ArrowLeft') goBack();
+                if (e.key === 'ArrowRight') goForward();
+            };
+
+
+            const difficultPage = ref(0);
+            const difficultyThreshold = computed(() => initialRepetitions.value * 2);
+
+            const visibleDifficultQuestions = computed(() => {
+                const start = difficultPage.value * 3;
+                return topDifficultQuestions.value.slice(start, start + 3);
+            });
+
+            const loadMoreDifficult = () => {
+                if ((difficultPage.value + 1) * 3 < topDifficultQuestions.value.length) {
+                    difficultPage.value++;
+                }
+            };
             const showQuestionPopup = ref(false);
             const selectedQuestion = ref(null);
             const averageTimePerQuestion = computed(() => {
@@ -258,7 +299,6 @@
             const topDifficultQuestions = computed(() => {
                 return Object.values(questionStats.value)
                     .sort((a, b) => b.incorrectCount - a.incorrectCount)
-                    .slice(0, 3);
             });
 
             const difficultyStats = computed(() => {
@@ -781,7 +821,8 @@
             // -----------------------------------
             // OnMounted
             // -----------------------------------
-            onMounted(async () => {
+    onMounted(async () => {
+                window.addEventListener('keydown', handleKeydown);
                 await loadQuestions();
                 const key = `quizProgress_${testName.value}`;
                 const savedProgress = localStorage.getItem(key);
@@ -794,7 +835,9 @@
                         () => { }
                     );
                 }
-
+                onUnmounted(() => {
+                    window.removeEventListener('keydown', handleKeydown);
+                });
                 if (window.electronAPI && window.electronAPI.onWindowClose) {
                     window.electronAPI.onWindowClose((event) => {
                         if (!progressSaved.value && (history.value.length > 0 || pendingQuestions.value.length > 0)) {
@@ -870,13 +913,43 @@
                 difficultyStats,
                 showQuestionPopup,
                 selectedQuestion,
-                openQuestionPopup
+                openQuestionPopup,
+                difficultPage,
+                difficultyThreshold,
+                visibleDifficultQuestions,
+                loadMoreDifficult,
+                topDifficultQuestions
             };
         }
     };
 </script>
 
 <style scoped>
+    .pagination-controls {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1rem;
+    }
+
+        .pagination-controls.center-single-button {
+            justify-content: center;
+        }
+
+    .pagination-btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        background: #2196f3;
+        color: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+        .pagination-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
     .answer-content {
         display: flex;
         flex-direction: column;
@@ -1027,7 +1100,7 @@
     }
 
     .question-text {
-        font-size: 1rem;
+        font-size: 1.4rem;
         margin: 1rem 0;
         text-align: center;
         flex: 1;
@@ -1157,6 +1230,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        height: 2.85rem;
     }
 
         .back-btn:hover {
