@@ -1,11 +1,24 @@
-
-funkcje:
--tworzenie pytan, wybor folderu, tworzenie/modyfikowanie/usuwanie plikow .txt
--obsluga zdjęcia + pytania w jednym pytaniu (nie było to możliwe w testowniku) 
--quizy (tak jak w testowniku, liczba powtorzen itp., można dowolnie ustawiac, zapisuje sie to, wiec ustawiacie raz i zapominacie)
--przycisk powrotu do poprzedniego pytania po udzieleniu odpowiedzi
--do pytan oraz odpowiedzi mogą zostać dodane wyjaśnienia (znak zapytania w kreatorze pytan), które wyswietlaja się potem w quizie po udzieleniu odpowiedzi (UWAGA, wyjasnienie do pytania pojawia sie przed udzieleniem odpowiedzi!!!) 
--funkcjonalnosc zapisu postepow
--funkcja scalania folderow (czyli jak kazdy wysle swoje pliki to mozna wewnatrz aplikacji je wszystkie scalic, program rozpozna duplikaty nazw i odpowiednio je zmodyfikuje, wiec nic sie nie wykrzaczy jak przy recznym kopiowaniu, kopiowane sa pytania jak i zdjecia) 
--eksport pytan do pdfa, zdjecia rowniez sie eksportuja, a wyjasnienia/poprawnosc odpowiedzi mozna odpowiednio wlaczyc/wylaczyc w zaleznosci jak chcemy
->>>>>>> 2322664748667c033deec4331c1f9224460b88ba
+## Prosta aplikacja do tworzenia quizów jedno/wielokrotnego wyboru.
+Krótka historia: aplikacja wzorowana na [TestownikuPWR](https://github.com/TestownikiPWR), nie miał on wielu funkcji które były dla mnie niezbędne więc postanowiłem napisać od zera PoliTest ;)
+<br>
+Funkcje aplikacji:
+* Kreator/edytor pytań, nie trzeba ręcznie tworzyć plików .txt, nazwy plików generowane na podstawie treści pytania
+* Obsługa zdjęć, można je dodawać do pytania/dowolnej odpowiedzi, automatycznie kopiowane do pliku z testem
+* Obsługa wyjaśnień do pytań/odpowiedzi (wyjaśnienia do pytania pojawiają się przed udzieleniem odpowiedzi, wyjaśnienia do odpowiedzi pojawiają się po udzieleniu odpowiedzi)
+* Quiz, możliwość ustawienia dodatkowych powtórzeń przy błędnej odpowiedzi, wstępnych powtórzeń, maksymalnej liczba powtórzeń, losowa kolejność pytań oraz odpowiedzi, możliwość powrotu do poprzednich pytań, mechanizm opanowywania pytań, wiele statystyk po zakończeniu quizu (np. najtrudniejsze pytania, średni czas na odpowiedź)
+* Zapisywanie postępów quizów, ustawień
+* Scalanie folderów (automatyczne kopiowanie, rozpoznawanie duplikatów nazw oraz ich odpowiednia modyfikacja)
+* Eksport pytań do PDF, wyjaśnienia oraz poprawność odpowiedzi można odpowiednio włączyć/wyłączyć
+* Skróty klawiszowe:
+  * W kreatorze pytań:
+    * Ctrl+D - Dodaje nową odpowiedź
+    * Enter - Zapisuje pytanie
+    * Strzałki ↑/↓ w polu odpowiedzi - Nawigacja między polami
+    * Ctrl+1-9 - Zaznacza odpowiedź jako poprawną o danym numerze (1-9)
+    * Ctrl+Backspace w pustym polu - Usuwa odpowiedź 
+    * Ctrl+W - dodanie wyjaśnienia do pytania/odpowiedzi
+  * Podczas quizu:
+    * 1-9 - wybiera odpowiedź
+    * Enter - zatwierdza odpowiedzi
+    * Strzałka w lewo - poprzednie pytanie
+    * Strzałka w prawo - następne pytanie
